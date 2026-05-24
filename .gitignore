@@ -1,0 +1,31 @@
+# Secrets — NEVER commit
+.env
+*.pem
+config/tiger_private_key.pem
+
+# Pipeline outputs (regenerable from main.py)
+output/
+*.xlsx
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.pytest_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Stale root-level duplicate files (kept locally but should never be committed)
+/extract.py
+/load.py
+/settings.py
