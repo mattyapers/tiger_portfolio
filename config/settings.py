@@ -210,11 +210,43 @@ SNAPSHOT_DATE = '2026-05-05'
 # Bump 'value' (YYYY-MM-DD) every time you actually refresh the underlying data.
 # The audit module compares each entry to today and flags STALE if older than cadence_days.
 DATA_FRESHNESS = {
-    'snapshot_date':     {'value': SNAPSHOT_DATE, 'cadence_days': 14, 'label': 'Holdings snapshot'},
-    'pe_5y_averages':    {'value': '2026-03-30',  'cadence_days': 90, 'label': '5Y P/E averages (quarterly)'},
-    'macro_regime':      {'value': '2026-05-05',  'cadence_days': 7,  'label': 'Macro regime block'},
-    'satellite_targets': {'value': '2026-04-17',  'cadence_days': 30, 'label': 'Satellite tier weights'},
-    'offline_prices':    {'value': SNAPSHOT_DATE, 'cadence_days': 14, 'label': 'extract_offline() prices'},
+    # key: {value: last-updated date, cadence_days: max acceptable age, label: display name, update_action: exact thing to do}
+    'snapshot_date': {
+        'value':         SNAPSHOT_DATE,
+        'cadence_days':  14,
+        'label':         'Holdings snapshot',
+        'update_action': 'Run main.py (any mode); bump SNAPSHOT_DATE to today',
+    },
+    'macro_regime': {
+        'value':         '2026-05-05',
+        'cadence_days':  7,
+        'label':         'Macro regime block',
+        'update_action': 'Update MACRO_REGIME dict + open_inflections in settings.py; bump value here',
+    },
+    'pe_5y_averages': {
+        'value':         '2026-03-30',
+        'cadence_days':  90,
+        'label':         '5Y P/E averages (quarterly)',
+        'update_action': 'Refresh PE_5Y_AVERAGES from Macrotrends/YF; bump value here',
+    },
+    'satellite_targets': {
+        'value':         '2026-04-17',
+        'cadence_days':  30,
+        'label':         'Satellite tier weights',
+        'update_action': 'Review SATELLITE_TARGETS for post-trade changes; bump value here',
+    },
+    'watchlist': {
+        'value':         '2026-05-05',
+        'cadence_days':  14,
+        'label':         'Watchlist pending actions',
+        'update_action': 'Resolve or extend each WATCHLIST entry; bump value here',
+    },
+    'offline_prices': {
+        'value':         SNAPSHOT_DATE,
+        'cadence_days':  14,
+        'label':         'extract_offline() prices',
+        'update_action': 'Run main.py --yf-only or --hybrid; SNAPSHOT_DATE auto-syncs',
+    },
 }
 
 # ============================================================
