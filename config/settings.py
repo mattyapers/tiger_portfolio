@@ -132,33 +132,33 @@ PE_5Y_AVERAGES = {
 # MACRO REGIME — Updated 2026-06-06
 # ============================================================
 MACRO_REGIME = {
-    'as_of_date': '2026-06-06',
+    'as_of_date': '2026-07-08',
     'quadrant': 'D',
-    'regime_label': 'Stagflation-Lite Intensifying — HIKE re-pricing emerges (cuts dead, energy shock persistent)',
-    'confidence': 'high',
-    'fed_funds_rate': '3.50–3.75% (held Apr 29, 8-4 vote); June 16-17 still 99.4% hold but cuts entirely priced out',
-    'fed_balance_sheet': '$6.7T as of May 27 H.4.1; still contracting; $300B below $7T QB trigger; moving AWAY from QB',
-    'pce_headline': '3.8% YoY (April, released May 28) — highest since May 2023; May print due June 26',
-    'pce_core': '3.3% YoY (April, released May 28) — highest since Nov 2023',
-    'cpi_latest': '3.8% YoY (April, released May 12); energy +17.9% YoY (steepest since Sep 2022); gasoline +28.4%; core CPI 2.8%; May print due June 10',
-    'jobs_may': 'Nonfarm payrolls +172k (vs 85k consensus); unemployment 4.3%; avg hourly earnings +0.3% MoM — hot, supports HIKE narrative',
-    'yield_curve': '10Y 4.55% / 2Y 4.17% (June 5 close) = +38bp; 2Y at highest since Feb 2025; 20Y/30Y back above 5% — bear-steepening on hike fears',
-    'vix': '20+ close June 5 (+34% on day); broke from 16 range on Nasdaq -4% (AI skepticism + Meta secondary + yield surge); NOT yet >35 Emergency threshold',
-    'brent': '$94.66/bbl (June 5); -3% on diplomatic-progress rumor; peaked $117.29 April; geopolitical premium re-engaging on Jun 5 drone incident',
-    'fedwatch_next_meeting': 'June 16-17 FOMC: 99.4% hold / 0.6% cut (May 31 print); hold odds intact through hot CPI/NFP',
-    'fedwatch_dec_cumulative': 'Cuts priced to ~0% by Dec; Kalshi shows ~27-30% probability of a HIKE before Dec 2026; +climbing post-CPI/NFP',
-    'hormuz_status': 'Day 97 closed — only ~10 transits/day vs ~95 baseline; US shot down 4 Iranian drones June 5 + struck Iranian radar; MOU stalling',
-    'tariff_section_122': 'CIT struck down May 7 (2-1, plaintiff-only); CAFC stay May 12; statutory expiry July 24, 2026; appeal pending',
-    'mas_stance': 'Held Apr 14 — slight S$NEER appreciation slope retained; MAS Core elevated; SGD tailwind intact',
+    'regime_label': 'Stagflation-Lite / Hike-Risk, Geopolitical Escalation Re-Igniting (Hormuz ceasefire fraying)',
+    'confidence': 'medium',
+    'fed_funds_rate': '3.50–3.75% (held since Dec 2025 cut); July 28-29 FOMC: 73.4% hold probability (Jul 7 print)',
+    'fed_balance_sheet': '$6.736T total assets (H.4.1, wk of Jun 24, released Jul 2); $264B below $7T QB trigger; roughly flat',
+    'pce_headline': '4.07% YoY (May print, released Jun 25) — accelerating',
+    'pce_core': '3.41% YoY (May print) — highest since Oct 2023',
+    'cpi_latest': '4.2% YoY headline / 2.9% core (May print, released Jun 10); energy +23.5% YoY, gasoline +40.5%; June print due Jul 14',
+    'jobs_may': "June payrolls +57k (vs 115k consensus), well below May's downwardly-revised +129k; unemployment 4.2% (participation fell to 61.5%, lowest since Mar 2021) — soft print despite hot inflation",
+    'yield_curve': '10Y 4.49% / 2Y 4.14% (Jul 2 close) = +35bp; positive, roughly stable vs prior weeks',
+    'vix': '16.36, +5.07% (Jul 8) — no breach of 25/35 despite active Hormuz conflict; lagging the geopolitical news flow',
+    'brent': '$77.92/bbl, +5.06% on the day (Jul 8) on Hormuz tanker attacks + US revoking Iran oil waiver',
+    'fedwatch_next_meeting': 'July 28-29 FOMC: 73.4% hold probability (Jul 7 print)',
+    'fedwatch_dec_cumulative': '~78.2% no-change / ~15.4% cut / ~5.4% hike cumulative to Dec 2026 (approximate/illustrative pricing)',
+    'hormuz_status': 'Contested/reopening — Iran struck 3 ships Jul 6-7; US hit 80+ targets in response Jul 7-8; traffic resilient (108 crossings over the weekend) vs 120-140/day pre-war baseline',
+    'tariff_section_122': 'CIT struck down 10% surcharge May 7 (2-1); Federal Circuit stayed ruling Jun 11 pending appeal; tariff still collected; statutory expiry ~Jul 23-24, 2026',
+    'mas_stance': 'Last statement Apr 14 — slightly steeper S$NEER appreciation slope on inflation concerns; next quarterly statement due Jul 2026, not yet released as of Jul 8',
     'open_inflections': [
-        'June 10 CPI (May print) — hot read (≥3.5% headline or ≥2.9% core) would push HIKE probability >40% and crater duration assets',
-        'June 16-17 FOMC under Warsh — dot plot is the key signal; any 2026 hike penciled in would re-rate growth equity another leg lower',
-        'Hormuz escalation — June 5 drone strikes signal MOU stalling; if Iran retaliates on shipping again, Brent retests $110+',
-        'June 26 PCE (May print) — another acceleration confirms stagflation lock-in, reinforces D regime',
-        'Section 122 CAFC ruling — substantive overturn before July 24 would mildly disinflationary, offset by hike-risk discount',
-        'VIX 20+ post Jun 5 — if it breaks 25, growth multiple compression accelerates; if >35, Emergency Protocol triggers',
+        'US-Iran ceasefire (Islamabad MOU, signed Jun 17) declared "over" by Trump Jul 8 after mutual strikes — watch for formal collapse vs. talks continuing',
+        'Fed balance sheet vs $7T + Dec cut prob vs 30% — Quadrant B rotation trigger, currently $264B / ~15pp away',
+        'Section 122 tariff appeal outcome before Jul 23-24 statutory expiry',
+        'VIX/Brent repricing lag — equity vol has not yet reflected the Jul 6-8 Hormuz escalation; a catch-up spike could raise regime confidence to High',
+        'MAS July quarterly policy statement — due but not yet released',
+        'June CPI print due Jul 14 — hot read would reinforce hike-risk/D regime lock-in',
     ],
-    'quadrant_b_distance': 'very far — moving away (BS contracting + hike risk emerging is opposite direction)',
+    'quadrant_b_distance': 'far',
 }
 
 # ============================================================
@@ -205,7 +205,7 @@ NAS_PATH = '/volume1/investments/portfolio_tracker.xlsx'
 # ============================================================
 # SNAPSHOT DATE
 # ============================================================
-SNAPSHOT_DATE = '2026-05-05'
+SNAPSHOT_DATE = '2026-07-08'
 
 # ============================================================
 # DATA FRESHNESS METADATA
@@ -221,7 +221,7 @@ DATA_FRESHNESS = {
         'update_action': 'Run main.py (any mode); bump SNAPSHOT_DATE to today',
     },
     'macro_regime': {
-        'value':         '2026-06-06',
+        'value':         '2026-07-08',
         'cadence_days':  7,
         'label':         'Macro regime block',
         'update_action': 'Update MACRO_REGIME dict + open_inflections in settings.py; bump value here',
