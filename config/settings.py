@@ -129,33 +129,36 @@ PE_5Y_AVERAGES = {
 }
 
 # ============================================================
-# MACRO REGIME — Updated 2026-05-05
+# MACRO REGIME — Updated 2026-06-06
 # ============================================================
 MACRO_REGIME = {
-    'as_of_date': '2026-05-05',
+    'as_of_date': '2026-06-06',
     'quadrant': 'D',
-    'regime_label': 'Stagflation-Lite + Energy Shock Persistent (Hormuz limbo)',
+    'regime_label': 'Stagflation-Lite Intensifying — HIKE re-pricing emerges (cuts dead, energy shock persistent)',
     'confidence': 'high',
-    'fed_funds_rate': '3.50–3.75% (held Apr 29, third consecutive)',
-    'fed_balance_sheet': '$6.7T as of Apr 23, contracting (-$7B WoW, -$9B YoY)',
-    'pce_headline': '3.5% YoY (March print, released Apr 30)',
-    'pce_core': '3.2% YoY (March print, released Apr 30)',
-    'yield_curve': '10Y 4.39% / 2Y 3.88% = +51bp (modestly positive, flatter than historical average)',
-    'vix': '16.78 (May 3); -38% over 30d, risk-on complacent',
-    'brent': '$108.17/bbl (May 3); ~$108-111 weekly range',
-    'fedwatch_next_meeting': 'June 16-17 FOMC: ~70% hold / ~28% cut',
-    'fedwatch_dec_cumulative': 'NEEDS INPUT — Fed dot plot signals 1 cut penciled for 2026; swaps markets show mixed near-zero implied cut by some measures',
-    'hormuz_status': 'Effectively closed — Iran declared open Apr 17, US blockade continues, shipping -90%',
-    'tariff_section_122': 'Active 15% global (effective Feb 24); expires Jul 24, 2026; CIT challenge filed Mar 5 by 24 states; admin planning Section 301/232 replacements',
-    'mas_stance': 'Tightened Apr 14, 2026 — slight increase in S$NEER appreciation slope (first tightening since 2022); SGD tailwind for USD-asset holders',
+    'fed_funds_rate': '3.50–3.75% (held Apr 29, 8-4 vote); June 16-17 still 99.4% hold but cuts entirely priced out',
+    'fed_balance_sheet': '$6.7T as of May 27 H.4.1; still contracting; $300B below $7T QB trigger; moving AWAY from QB',
+    'pce_headline': '3.8% YoY (April, released May 28) — highest since May 2023; May print due June 26',
+    'pce_core': '3.3% YoY (April, released May 28) — highest since Nov 2023',
+    'cpi_latest': '3.8% YoY (April, released May 12); energy +17.9% YoY (steepest since Sep 2022); gasoline +28.4%; core CPI 2.8%; May print due June 10',
+    'jobs_may': 'Nonfarm payrolls +172k (vs 85k consensus); unemployment 4.3%; avg hourly earnings +0.3% MoM — hot, supports HIKE narrative',
+    'yield_curve': '10Y 4.55% / 2Y 4.17% (June 5 close) = +38bp; 2Y at highest since Feb 2025; 20Y/30Y back above 5% — bear-steepening on hike fears',
+    'vix': '20+ close June 5 (+34% on day); broke from 16 range on Nasdaq -4% (AI skepticism + Meta secondary + yield surge); NOT yet >35 Emergency threshold',
+    'brent': '$94.66/bbl (June 5); -3% on diplomatic-progress rumor; peaked $117.29 April; geopolitical premium re-engaging on Jun 5 drone incident',
+    'fedwatch_next_meeting': 'June 16-17 FOMC: 99.4% hold / 0.6% cut (May 31 print); hold odds intact through hot CPI/NFP',
+    'fedwatch_dec_cumulative': 'Cuts priced to ~0% by Dec; Kalshi shows ~27-30% probability of a HIKE before Dec 2026; +climbing post-CPI/NFP',
+    'hormuz_status': 'Day 97 closed — only ~10 transits/day vs ~95 baseline; US shot down 4 Iranian drones June 5 + struck Iranian radar; MOU stalling',
+    'tariff_section_122': 'CIT struck down May 7 (2-1, plaintiff-only); CAFC stay May 12; statutory expiry July 24, 2026; appeal pending',
+    'mas_stance': 'Held Apr 14 — slight S$NEER appreciation slope retained; MAS Core elevated; SGD tailwind intact',
     'open_inflections': [
-        'Strait of Hormuz reopening — Iran says open, US blockade continues, oil pricing the gap',
-        'Powell→Warsh handover — Apr 29 reportedly Powell\'s final FOMC; Warsh policy stance unconfirmed',
-        'June 16-17 FOMC — first decision likely under new chair; FedWatch ~28% cut',
-        'Iran ceasefire violations — both sides accuse small-scale attacks; re-escalation risk',
-        'Section 122 tariff expiry Jul 24 — Congressional extension unlikely; Section 301/232 replacement timing TBD',
+        'June 10 CPI (May print) — hot read (≥3.5% headline or ≥2.9% core) would push HIKE probability >40% and crater duration assets',
+        'June 16-17 FOMC under Warsh — dot plot is the key signal; any 2026 hike penciled in would re-rate growth equity another leg lower',
+        'Hormuz escalation — June 5 drone strikes signal MOU stalling; if Iran retaliates on shipping again, Brent retests $110+',
+        'June 26 PCE (May print) — another acceleration confirms stagflation lock-in, reinforces D regime',
+        'Section 122 CAFC ruling — substantive overturn before July 24 would mildly disinflationary, offset by hike-risk discount',
+        'VIX 20+ post Jun 5 — if it breaks 25, growth multiple compression accelerates; if >35, Emergency Protocol triggers',
     ],
-    'quadrant_b_distance': 'far',
+    'quadrant_b_distance': 'very far — moving away (BS contracting + hike risk emerging is opposite direction)',
 }
 
 # ============================================================
@@ -218,7 +221,7 @@ DATA_FRESHNESS = {
         'update_action': 'Run main.py (any mode); bump SNAPSHOT_DATE to today',
     },
     'macro_regime': {
-        'value':         '2026-05-05',
+        'value':         '2026-06-06',
         'cadence_days':  7,
         'label':         'Macro regime block',
         'update_action': 'Update MACRO_REGIME dict + open_inflections in settings.py; bump value here',
@@ -324,6 +327,43 @@ WATCHLIST = {
         'ticker': 'COPX',
         'target_price': None,
         'note': 'Copper miners — critical minerals theme',
+    },
+    'MRVL': {
+        'ticker': 'MRVL',
+        'target_price': None,
+        'note': (
+            'Custom silicon / data center / AI infrastructure. Similar regime profile to NVDA — '
+            'not a Quadrant D fit (high multiple, growth, no FCF cushion). Hold on watchlist for '
+            'a regime shift toward B (Fed BS > $7T + cut prob > 30%) or for a major valuation reset.'
+        ),
+    },
+    # === Quadrant D regime-fit additions (added 2026-06-03) ===
+    'WPM': {
+        'ticker': 'WPM',
+        'target_price': None,
+        'note': (
+            'Wheaton Precious Metals — gold/silver streaming. Asset-light leverage to GLDM thesis '
+            'with real FCF (vs miners with capex risk). Quadrant D fit: real assets + pricing power. '
+            'Entry: confirm 5Y avg P/E vs current; size as Tier-1 satellite candidate if GLDM grows.'
+        ),
+    },
+    'MOS': {
+        'ticker': 'MOS',
+        'target_price': None,
+        'note': (
+            'Mosaic — phosphate/potash fertilizer. Complements NTR food-security thesis; pure-play '
+            'commodity exposure. Quadrant D fit: real asset, inflation-linked. '
+            'Entry: only if NTR thesis confirms and Mosaic trades at <12x forward earnings.'
+        ),
+    },
+    'LIN': {
+        'ticker': 'LIN',
+        'target_price': None,
+        'note': (
+            'Linde — industrial gases duopoly (with APD on QB list). Defensive compounder with '
+            'pricing power and contractual revenue. Quadrant D fit: pricing power + FCF moat. '
+            'Entry: research P/E vs 5Y avg first; rich quality names often start above fair value.'
+        ),
     },
     # Quadrant B rotation candidates — DO NOT enter yet. Monitor for Fed BS > $7T + cut prob > 30%.
     'QB_ISRG':  {'ticker': 'ISRG',  'action': 'WATCH', 'note': 'Quadrant B candidate — surgical robotics growth'},
