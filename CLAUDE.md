@@ -52,8 +52,17 @@ Pure data transformation — no I/O. Takes the extracted DataFrames and produces
 **Stage 3 — `modules/load.py`**
 Writes to Excel using `openpyxl`. Generates four sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals. Blue cells = editable inputs; black = Excel formulas; yellow = attention flags.
 
+**Stage 3b — `modules/dashboard.py`**
+Generates a self-contained, single-page HTML dashboard with 4 integrated sections:
+- **Portfolio Overview** — Total equity, cash, P&L, allocation by tier (Core/Bonds/Satellite), doughnut chart
+- **Stock Deep-Dive Cards** — For each holding: shares, cost basis, P/E, gain/loss %, progress bar
+- **Macro Monitor** — CPI, PCE, unemployment, Fed funds rate, GDP growth, Treasury yields (10Y/2Y), yield curve, DXY
+- **Technical Snapshot** — Per holding: 52-week high/low, distance from highs/lows, 50/200-day moving averages, RSI (14-day), overbought/neutral/oversold flags
+
+Uses free CDN charting library (Chart.js) and includes inline CSS/JS. Includes data-source appendix and standard investment disclaimer. Can run standalone: `python modules/dashboard.py` (reads `output/latest_snapshot.json`, outputs to `output/dashboard.html`).
+
 **Orchestrator — `main.py`**
-Calls the three stages in sequence. Handles logging setup. Selects extract mode from CLI args.
+Calls the three stages in sequence, plus dashboard generation. Handles logging setup. Selects extract mode from CLI args.
 
 ## Configuration
 
