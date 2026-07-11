@@ -51,6 +51,7 @@ from modules.extract import extract_hybrid, extract_yf_only, extract_offline
 from modules.transform import transform_all
 from modules.load import load_to_excel
 from modules.audit import validate_freshness, price_sanity_check
+from modules.dashboard import generate_html_dashboard
 
 
 def run_pipeline(mode='hybrid'):
@@ -114,6 +115,17 @@ def run_pipeline(mode='hybrid'):
     logger.info("STAGE 3: Writing to Excel...")
     output_path = load_to_excel(analytics, settings)
     logger.info(f"  Output: {output_path}")
+
+    # STAGE 3b: Generate HTML Dashboard
+    logger.info("STAGE 3b: Generating HTML dashboard...")
+    try:
+        dashboard_path = generate_html_dashboard(
+            snapshot_path="output/latest_snapshot.json",
+            output_path="output/dashboard.html"
+        )
+        logger.info(f"  Dashboard: {dashboard_path}")
+    except Exception as e:
+        logger.warning(f"  Dashboard generation failed: {e}")
 
     logger.info("=" * 60)
     logger.info("PIPELINE COMPLETE")
