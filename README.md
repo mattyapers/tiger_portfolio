@@ -1,9 +1,9 @@
 # Tiger Portfolio Tracker
 
-A rules-based portfolio management pipeline for a Singapore-based investor running a Core (68%) / Core-Plus (11%) / Satellite (21%) allocation with a 30-year, 8% CAGR target.
+A rules-based portfolio management pipeline for a Singapore-based investor running a Core (68%) / Core-Plus (11%) / Satellite (21%) allocation with a 30-year, 8% CAGR target. Generates both an interactive Excel report and a self-contained HTML dashboard.
 
 **Author:** Matthew  
-**Last Updated:** 2026-04-18  
+**Last Updated:** 2026-07-11  
 **Python:** 3.12+ on Windows  
 
 ---
@@ -24,7 +24,7 @@ python main.py --yf-only
 python main.py --offline
 ```
 
-Output: `output/portfolio_tracker.xlsx`
+Output: `output/portfolio_tracker.xlsx` and `output/dashboard.html`
 
 ---
 
@@ -43,9 +43,13 @@ main.py (orchestrator)
   │                        ├─ generate rebalance signals
   │                        └─ score entry/exit opportunities
   │
-  └─ STAGE 3: load.py ───── write Excel (formulas, not hardcodes)
-                           └── 4 sheets: Dashboard, Holdings,
-                               Rebalance Signals, Entry Signals
+  ├─ STAGE 3: load.py ───── write Excel (formulas, not hardcodes)
+  │                       └── 4 sheets: Dashboard, Holdings,
+  │                           Rebalance Signals, Entry Signals
+  │
+  └─ STAGE 3b: dashboard.py ─ fetch technical data (RSI, MAs, 52W range)
+                             ├─ fetch macro data (CPI, unemployment, yields)
+                             └─ generate self-contained HTML dashboard
 ```
 
 **Data flow:** Every file passes data forward as DataFrames or dicts. `settings.py` is imported by all three stages — it's the single source of truth for rules, thresholds, and targets.
@@ -65,9 +69,12 @@ tiger_portfolio/
 │   ├── extract.py           ← Stage 1: Pull data from Tiger + yfinance.
 │   ├── transform.py         ← Stage 2: Calculate metrics, generate signals.
 │   ├── load.py              ← Stage 3: Write Excel workbook.
+│   ├── dashboard.py         ← Stage 3b: Generate HTML portfolio dashboard.
+│   ├── audit.py             ← Data freshness checks.
 │   └── __init__.py
 ├── output/
-│   ├── portfolio_tracker.xlsx  ← Generated Excel report.
+│   ├── portfolio_tracker.xlsx  ← Generated Excel report (4 sheets).
+│   ├── dashboard.html          ← Generated HTML dashboard (4 sections).
 │   ├── latest_snapshot.json    ← Auto-saved after every hybrid/yf-only run.
 │   └── run_YYYYMMDD_HHMM.log  ← Log file per run.
 └── README.md                ← You are here.
@@ -88,6 +95,27 @@ tiger_portfolio/
 Every time you run `--hybrid` or `--yf-only`, the pipeline auto-saves your positions + prices to `output/latest_snapshot.json`. When you run `--offline`, it reads this snapshot instead of stale hardcoded data. So as long as you run the live pipeline periodically, offline mode stays current.
 
 If `latest_snapshot.json` doesn't exist (first run ever), offline falls back to hardcoded data in `extract.py`.
+
+---
+
+## HTML Dashboard
+
+The pipeline generates a **self-contained HTML dashboard** (`output/dashboard.html`) with 4 sections:
+
+- **Portfolio Overview** — Total equity, P&L, allocation by tier (Core/Bonds/Satellite), doughnut chart
+- **Stock Deep-Dive Cards** — Per holding: shares, cost basis, P/E, gain/loss %, progress bar
+- **Macro Monitor** — CPI, PCE, unemployment, Fed funds rate, GDP growth, Treasury yields (10Y/2Y), yield curve, DXY
+- **Technical Snapshot** — Per holding: 52W high/low, moving averages (50/200-day), RSI (14-day), overbought/oversold flags
+
+**Features:**
+- Self-contained (73KB) — works offline after initial generation
+- No external dependencies (uses Chart.js from free CDN)
+- Interactive allocation chart with hover tooltips
+- Color-coded metrics (green for gains, red for losses)
+- Responsive design (desktop/tablet/mobile)
+- Data source appendix + investment disclaimer included
+
+Simply open `output/dashboard.html` in any web browser after running the pipeline. See [DASHBOARD_README.md](DASHBOARD_README.md) for detailed customization guide.
 
 ---
 
@@ -214,8 +242,10 @@ Operational checklists and execution plans live in Notion under the Investing wo
 
 ## Future Roadmap
 
+- [x] HTML dashboard with 4 integrated sections (Portfolio Overview, Stock Cards, Macro Monitor, Technical)
 - [ ] Deploy to Synology NAS for automated daily runs
 - [ ] Add correlation matrix sheet to Excel output
 - [ ] Bond duration calculator sheet
-- [ ] Streamlit dashboard for real-time web UI
+- [ ] Extend technical indicators (Bollinger Bands, MACD, volume analysis)
+- [ ] Add portfolio performance charts (daily/weekly/monthly returns)
 - [ ] Automated Notion updates via MCP after each pipeline run
