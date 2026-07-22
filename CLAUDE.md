@@ -126,9 +126,4 @@ python main.py --yf-only   # live prices, no Tiger credentials needed, ~15 secon
 python main.py --offline   # instant, uses latest saved snapshot
 ```
 
-## Deployment
 
-Runs on a Synology NAS via cron every 14 days:
-```bash
-0 20 */14 * * cd /volume1/investments/tiger_portfolio && python3 main.py
-```
