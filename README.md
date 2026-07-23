@@ -217,6 +217,8 @@ The `prompts/` directory contains three Claude prompts that form a structured re
 2. Paste the full contents of `prompts/stage1_macro_regime.md`
 3. Copy the output `MACRO_REGIME` dict into `config/settings.py` → rerun `python main.py`
 
+> **Key mapping note:** The Stage 1 dict uses shortened keys (`ffr`, `bs`, `pce_h`, `pce_c`, `fw_next`, `fw_dec`, `b_dist`). Map these to the full key names already present in `config/settings.py` when pasting — don't overwrite the existing key structure.
+
 **Stage 2** (requires the Excel output):
 1. Open a new Claude conversation
 2. Paste the full contents of `prompts/stage2_weekly_review.md`
