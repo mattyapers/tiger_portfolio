@@ -11,10 +11,11 @@ Guide for Claude Code in this repo.
 6. [Config](#configuration)
 7. [Data Contracts](#inter-stage-data-contracts)
 8. [Manual Updates](#manual-update-checklist-every-14-day-cycle)
-9. [Add Ticker](#adding-a-new-ticker)
-10. [Testing](#testing)
-11. [Issues](#common-issues)
-12. [Protected Areas](#protected-areas)
+9. [Prompts](#prompts-directory)
+10. [Add Ticker](#adding-a-new-ticker)
+11. [Testing](#testing)
+12. [Issues](#common-issues)
+13. [Protected Areas](#protected-areas)
 
 ---
 
@@ -50,6 +51,10 @@ Artifacts: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `outp
 │   └── audit.py            # Data freshness + price-drift checks (called by transform)
 ├── config/
 │   └── settings.py         # All tunables + credential refs
+├── prompts/
+│   ├── stage0_freshness_check.md   # Staleness triage (no web search)
+│   ├── stage1_macro_regime.md      # Macro fetch + MACRO_REGIME dict output
+│   └── stage2_weekly_review.md     # Full weekly review (attach xlsx)
 └── output/
     ├── latest_snapshot.json
     ├── portfolio_tracker.xlsx
@@ -125,10 +130,8 @@ Key fields:
 
 ## Manual Update Checklist (Every 14-Day Cycle)
 
-Edit @config/settings.py:
-- [ ] `MACRO_REGIME['regime']` — active playbook
-- [ ] `MACRO_REGIME['last_updated']` — today
-- [ ] `MACRO_REGIME['vix']`, `['pce']`, `['notes']` — macro context
+Run the three-stage prompt workflow first (see [Prompts Directory](#prompts-directory)), then edit @config/settings.py:
+- [ ] `MACRO_REGIME` — paste the dict output from Stage 1 prompt
 - [ ] `PE_5Y_AVERAGES` — quarterly refresh
 - [ ] `WATCHLIST` — resolve/add actions
 - [ ] `SNAPSHOT_DATE` — if fresh snapshot
@@ -137,6 +140,22 @@ After removing a position:
 - [ ] Remove from `TICKER_TIERS`
 - [ ] If satellite: remove from `SATELLITE_TARGETS` and `PE_5Y_AVERAGES`
 - [ ] Delete `WATCHLIST` entry
+
+---
+
+## Prompts Directory
+
+`prompts/` contains three Claude prompts for the weekly review cycle. Run in order each 14-day cycle. Do not modify — treat as static input files.
+
+| File | Stage | Role | Key constraint |
+|---|---|---|---|
+| `stage0_freshness_check.md` | 0 | Staleness triage | No web search; deterministic logic only |
+| `stage1_macro_regime.md` | 1 | Macro data fetch | Outputs paste-ready `MACRO_REGIME` dict for `config/settings.py` |
+| `stage2_weekly_review.md` | 2 | Full portfolio review | Requires attached `output/portfolio_tracker.xlsx` |
+
+Stage 0 verdict gates the rest: GREEN skips straight to Stage 1; RED means update stale `settings.py` fields before continuing.
+
+The `MACRO_REGIME` dict structure output by Stage 1 uses shortened keys (`ffr`, `bs`, `pce_h`, `pce_c`, `fw_next`, `fw_dec`, `b_dist`) — map these to the full key names already in `config/settings.py` when pasting.
 
 ---
 
