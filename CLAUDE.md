@@ -1,129 +1,182 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guide for Claude Code in this repo.
+
+## Contents
+1. [Overview](#what-this-project-does)
+2. [Quick Commands](#quick-commands)
+3. [File Layout](#file-layout)
+4. [Dependencies](#dependencies)
+5. [Architecture](#architecture)
+6. [Config](#configuration)
+7. [Data Contracts](#inter-stage-data-contracts)
+8. [Manual Updates](#manual-update-checklist-every-14-day-cycle)
+9. [Add Ticker](#adding-a-new-ticker)
+10. [Testing](#testing)
+11. [Issues](#common-issues)
+12. [Protected Areas](#protected-areas)
+
+---
 
 ## What This Project Does
 
-Tiger Portfolio Tracker is a Python ETL pipeline for automated investment portfolio management. It connects to the Tiger Brokers API (Singapore brokerage) for live positions, pulls prices via yfinance, calculates allocation drift and macro-regime-based signals, and writes a dynamic Excel report.
+Tiger Portfolio Tracker: Python ETL for automated portfolio management. Connects to Tiger Brokers API (Singapore brokerage), pulls prices via yfinance, calculates allocation drift and macro-regime-based signals, writes a dynamic Excel report (`output/portfolio_tracker.xlsx`) and optional self-contained HTML dashboard (`output/dashboard.html`).
 
-## Running the Pipeline
+---
 
-```bash
-# Hybrid (default) — Tiger positions + yfinance prices
-python main.py
+## Quick Commands
 
-# YF-Only — offline shares + live yfinance prices (no Tiger API needed)
-python main.py --yf-only
+| Command | Mode | Needs API? | Time |
+|---|---|---|---|
+| `python main.py` | Hybrid (default) | Yes | ~30s |
+| `python main.py --yf-only` | Offline shares + yfinance | No | ~15s |
+| `python main.py --offline` | Latest snapshot | No | Instant |
+| `python modules/dashboard.py` | Standalone HTML | No | ~5s |
 
-# Offline — uses latest auto-saved snapshot (no internet)
-python main.py --offline
+Artifacts: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `output/run_YYYYMMDD_HHMM.log`.
+
+---
+
+## File Layout
+
+```
+.
+├── main.py                 # Orchestrator
+├── modules/
+│   ├── extract.py          # Stage 1 (hybrid / yf-only / offline)
+│   ├── transform.py        # Stage 2 (pure data, no I/O)
+│   ├── load.py             # Stage 3 (Excel via openpyxl)
+│   └── dashboard.py        # Stage 4 (HTML, Chart.js CDN)
+├── config/
+│   └── settings.py         # All tunables + credential refs
+└── output/
+    ├── latest_snapshot.json
+    ├── portfolio_tracker.xlsx
+    └── dashboard.html
 ```
 
-Output: `output/portfolio_tracker.xlsx` and `output/run_YYYYMMDD_HHMM.log`.
+> ⚠️ **Stale duplicates at root**: `extract.py`, `load.py`, `settings.py` are old copies. Live code is `modules/` and `config/`. Do not edit root `.py` files.
+
+---
 
 ## Dependencies
 
 ```bash
 pip install tigeropen yfinance openpyxl pandas numpy
 ```
+Python 3.9+. Credentials in `config/`: `tiger_private_key.pem` (RSA private key). Never commit.
 
-Credentials required in `config/`:
-- `tiger_private_key.pem` — RSA private key for Tiger API auth
+---
 
 ## Architecture
 
-Three independent, sequentially-executed stages, each in its own module:
+Sequential stages called by `main.py`:
 
-**Stage 1 — `modules/extract.py`**
-Three extract modes based on CLI flag:
-- `extract_hybrid()` — authenticates with Tiger (RSA-signed), fetches positions, then overlays live prices + P/E from yfinance. Auto-detects and fixes fractional share inflation (Tiger sometimes reports 0.6849 as 6849; fix: `real_shares = tiger_market_value / yf_price`). Saves result to `output/latest_snapshot.json`.
-- `extract_yf_only()` — uses hardcoded/snapshot shares, fetches live prices from yfinance. Also saves snapshot.
-- `extract_offline()` — loads `output/latest_snapshot.json` if it exists; falls back to hardcoded data in `_extract_hardcoded()`.
+1. **Extract** (`modules/extract.py`) — `extract_hybrid()` authenticates with Tiger (RSA-signed), fetches positions, overlays live prices + P/E from yfinance. Auto-fixes fractional share inflation (`real_shares = tiger_market_value / yf_price`). `extract_yf_only()` uses snapshot/hardcoded shares + yfinance. `extract_offline()` loads `output/latest_snapshot.json`, falls back to `_extract_hardcoded()`. Saves snapshot.
+2. **Transform** (`modules/transform.py`) — Pure data. Produces tier classification (`Core` / `Core-Bond` / `Core-Plus` / `Satellite`), weights and drift vs targets, rebalance signals (`TRIM` / `ADD` / `HOLD` at 3% threshold), macro-regime playbook signals, P/E entry/exit scores (1–5), satellite correlation matrix.
+3. **Load** (`modules/load.py`) — `openpyxl`. Four sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals. Blue = editable inputs; black = Excel formulas; yellow = flags.
+4. **Dashboard** (`modules/dashboard.py`) — Self-contained HTML with Portfolio Overview (doughnut), Stock Deep-Dive Cards, Macro Monitor (CPI, PCE, unemployment, Fed funds, GDP, Treasury yields 10Y/2Y, yield curve, DXY), Technical Snapshot (52W H/L, distance, 50/200 MA, RSI 14, flags). Inline CSS/JS + data-source appendix + investment disclaimer. Reads `output/latest_snapshot.json`.
 
-**Stage 2 — `modules/transform.py`**
-Pure data transformation — no I/O. Takes the extracted DataFrames and produces:
-- Tier classification (Core / Core-Bond / Core-Plus / Satellite) per ticker
-- Portfolio weights and drift vs. targets
-- Rebalance signals (TRIM / ADD / HOLD) using the 3% drift threshold
-- Macro-regime-based bond sleeve and satellite signals
-- P/E-based entry/exit scores (1–5 scale)
-- Satellite correlation matrix
-
-**Stage 3 — `modules/load.py`**
-Writes to Excel using `openpyxl`. Generates four sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals. Blue cells = editable inputs; black = Excel formulas; yellow = attention flags.
-
-**Stage 3b — `modules/dashboard.py`**
-Generates a self-contained, single-page HTML dashboard with 4 integrated sections:
-- **Portfolio Overview** — Total equity, cash, P&L, allocation by tier (Core/Bonds/Satellite), doughnut chart
-- **Stock Deep-Dive Cards** — For each holding: shares, cost basis, P/E, gain/loss %, progress bar
-- **Macro Monitor** — CPI, PCE, unemployment, Fed funds rate, GDP growth, Treasury yields (10Y/2Y), yield curve, DXY
-- **Technical Snapshot** — Per holding: 52-week high/low, distance from highs/lows, 50/200-day moving averages, RSI (14-day), overbought/neutral/oversold flags
-
-Uses free CDN charting library (Chart.js) and includes inline CSS/JS. Includes data-source appendix and standard investment disclaimer. Can run standalone: `python modules/dashboard.py` (reads `output/latest_snapshot.json`, outputs to `output/dashboard.html`).
-
-**Orchestrator — `main.py`**
-Calls the three stages in sequence, plus dashboard generation. Handles logging setup. Selects extract mode from CLI args.
+---
 
 ## Configuration
 
-All tunable parameters live in `config/settings.py` — no values are hardcoded in the modules:
+All tunable parameters in @config/settings.py. No hardcoding in modules.
 
-- **Tiger API credentials** — `TIGER_ID`, `ACCOUNT`, `PRIVATE_KEY_PATH`, `LICENSE`
-- **Portfolio structure** — `TIER_TARGETS` (68% Core / 11% Core-Plus / 21% Satellite), `TICKER_TIERS` mapping. `Core-Bond` is a sub-tier of Core for duration management (BND, IEF, SPTL, SHY, VTIP roll up to the 68% Core total).
-- **Satellite targets** — `SATELLITE_TARGETS` with per-ticker target weights within the satellite sleeve
-- **Macro regime** — `MACRO_REGIME` (manually updated every 14 days), `REGIME_PLAYBOOK` with 4 regimes (Stagflation, Growth/LowInflation, Recession/Deflation, Risk-Off/Transition) each defining `bond_sleeve` weights, `bond_duration_target`, and `satellite_overrides`
-- **Rebalancing rules** — `drift_threshold` (3%), `max_position_pct` (10%), `review_cycle_days` (14)
-- **Entry/exit signals** — `SIGNAL_RULES` with P/E thresholds and stop-loss/take-profit levels
+Key fields:
+- `TIGER_ID`, `ACCOUNT`, `PRIVATE_KEY_PATH`, `LICENSE`
+- Portfolio: `TIER_TARGETS` (68% Core / 11% Core-Plus / 21% Satellite), `TICKER_TIERS` (mapping; `Core-Bond` sub-tier rolls into Core: BND, IEF, SPTL, SHY, VTIP)
+- `SATELLITE_TARGETS` (per-ticker weights within satellite sleeve)
+- `MACRO_REGIME`: `regime` (active playbook key: `Stagflation` / `Growth/LowInflation` / `Recession/Deflation` / `Risk-Off/Transition`), `last_updated`, `vix`, `pce`, `notes` — update manually every 14 days
+- `REGIME_PLAYBOOK`: regime definitions (`bond_sleeve`, `bond_duration_target`, `satellite_overrides`)
+- `SIGNAL_RULES`: P/E thresholds, stop-loss/take-profit, `drift_threshold` (3%), `max_position_pct` (10%), `review_cycle_days` (14)
+- `PE_5Y_AVERAGES`: refresh quarterly
+- `WATCHLIST`: pending actions; resolve each cycle
+- `SNAPSHOT_DATE`: display label in Excel header
 
-`MACRO_REGIME['regime']` is the key field that drives which playbook is active — update it manually every 14-day review cycle.
+---
 
 ## Inter-Stage Data Contracts
 
-`extract_hybrid()` / `extract_yf_only()` / `extract_offline()` → `raw_data` dict:
-- `raw_data['positions']` — DataFrame with columns: `symbol`, `shares`, `avg_cost`, `latest_price`, `market_value`, `cost_basis`, `unrealized_pnl`, `pe_ttm`
-- `raw_data['account']` — dict with `total_equity`, `cash_balance`, `buying_power`, `unrealized_pnl`, `timestamp`
-- `raw_data['quotes']` — DataFrame with `symbol`, `latest_price`, `pe_ttm` (and more in hybrid mode)
-- `raw_data['timestamp']` — datetime of the extract
+### Extract → `raw_data`
 
-`transform_all()` → `analytics` dict:
-- `analytics['holdings']` — enriched positions DataFrame with `tier`, `tier_parent`, `weight`, `drift`
-- `analytics['summary']` — dict with `total_portfolio`, `core_pct`, `satellite_pct`, `total_pnl`, `total_pnl_pct`
-- `analytics['rebalance']` — DataFrame with `symbol`, `signal` (TRIM/ADD/HOLD), `action`
-- `analytics['macro_signals']` — DataFrame with `symbol`, `asset_class`, `action`, `urgency`
-- `analytics['entry_signals']` — DataFrame with `symbol`, `entry_signal`
-- `analytics['bond_duration']` — dict with `current_duration`, `target_duration`, `duration_gap`
-- `analytics['satellite_corr']` — correlation matrix DataFrame
+| Key | Type | Contents |
+|---|---|---|
+| `positions` | DataFrame | `symbol`, `shares`, `avg_cost`, `latest_price`, `market_value`, `cost_basis`, `unrealized_pnl`, `pe_ttm` |
+| `account` | dict | `total_equity`, `cash_balance`, `buying_power`, `unrealized_pnl`, `timestamp` |
+| `quotes` | DataFrame | `symbol`, `latest_price`, `pe_ttm` (+ hybrid extras) |
+| `timestamp` | datetime | Extract time |
 
-## Stale Root-Level Files
+### Transform → `analytics`
 
-There are duplicate `.py` files at the project root (`extract.py`, `load.py`, `settings.py`) — these are old copies, not the active code. The live modules are in `modules/` and `config/`. Do not edit the root-level duplicates.
+| Key | Type | Contents |
+|---|---|---|
+| `holdings` | DataFrame | Enriched: `tier`, `tier_parent`, `weight`, `drift` |
+| `summary` | dict | `total_portfolio`, `core_pct`, `satellite_pct`, `total_pnl`, `total_pnl_pct` |
+| `rebalance` | DataFrame | `symbol`, `signal` (`TRIM`/`ADD`/`HOLD`), `action` |
+| `macro_signals` | DataFrame | `symbol`, `asset_class`, `action`, `urgency` |
+| `entry_signals` | DataFrame | `symbol`, `entry_signal` |
+| `bond_duration` | dict | `current_duration`, `target_duration`, `duration_gap` |
+| `satellite_corr` | DataFrame | Correlation matrix |
 
-## Manual Fields to Update Each Cycle
+---
 
-In `config/settings.py`:
-- `MACRO_REGIME['regime']` — the active playbook key (Stagflation / Growth/LowInflation / Recession/Deflation / Risk-Off/Transition)
-- `MACRO_REGIME['last_updated']` — date of last regime assessment
-- `MACRO_REGIME['vix']`, `['pce']`, `['notes']` — update key macro context each cycle
-- `PE_5Y_AVERAGES` — refresh quarterly for accurate entry/exit signals
-- `WATCHLIST` — add/resolve pending actions (exits, deferrals, triggers) each cycle
+## Manual Update Checklist (Every 14-Day Cycle)
 
-`SNAPSHOT_DATE` is used as a display label in the Excel header; update when doing a fresh data snapshot.
+Edit @config/settings.py:
+- [ ] `MACRO_REGIME['regime']` — active playbook
+- [ ] `MACRO_REGIME['last_updated']` — today
+- [ ] `MACRO_REGIME['vix']`, `['pce']`, `['notes']` — macro context
+- [ ] `PE_5Y_AVERAGES` — quarterly refresh
+- [ ] `WATCHLIST` — resolve/add actions
+- [ ] `SNAPSHOT_DATE` — if fresh snapshot
 
-**After executing a trade that removes a position:** remove the ticker from `TICKER_TIERS` and `SATELLITE_TARGETS` (and `PE_5Y_AVERAGES` if applicable), then delete the corresponding `WATCHLIST` entry.
+After removing a position:
+- [ ] Remove from `TICKER_TIERS`
+- [ ] If satellite: remove from `SATELLITE_TARGETS` and `PE_5Y_AVERAGES`
+- [ ] Delete `WATCHLIST` entry
+
+---
 
 ## Adding a New Ticker
 
-1. Add to `TICKER_TIERS` in `config/settings.py`
-2. If satellite: add to `SATELLITE_TARGETS` with a weight (0.07 default)
+1. Add to `TICKER_TIERS` in @config/settings.py
+2. If satellite: add to `SATELLITE_TARGETS` (default 0.07)
 3. If satellite: add to `PE_5Y_AVERAGES`
-4. Add display name to `name_map` dict in `modules/load.py`
+4. Add display name to `name_map` in @modules/load.py
+
+---
 
 ## Testing
 
-No test suite exists. Primary dev feedback loop:
+No suite. Dev loop:
 ```bash
-python main.py --yf-only   # live prices, no Tiger credentials needed, ~15 seconds
-python main.py --offline   # instant, uses latest saved snapshot
+python main.py --yf-only   # ~15s, no keys
+python main.py --offline   # instant
 ```
+
+Expected outputs: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `output/run_YYYYMMDD_HHMM.log`. Optional dashboard: `python modules/dashboard.py`.
+
+---
+
+## Common Issues
+
+| Symptom | Fix |
+|---|---|
+| `FileNotFoundError: latest_snapshot.json` | Run `--yf-only` first; check `output/`. |
+| Tiger auth failure | Verify `config/tiger_private_key.pem` and `TIGER_ID`/`ACCOUNT` in @config/settings.py. |
+| Excel `#REF!` | Ticker removed from `TICKER_TIERS` but still referenced; clean mapping. |
+| Dashboard missing data | Ensure `latest_snapshot.json` exists; regenerate if needed. |
+
+---
+
+## Protected Areas
+
+- Do not edit root `extract.py`, `load.py`, `settings.py` (stale). Use `modules/` and `config/`.
+- Do not edit or commit `config/tiger_private_key.pem`.
+- Do not hand-edit `output/latest_snapshot.json` (overwritten by Stage 1).
+- All tunables must remain in @config/settings.py; no hardcoding in modules.
+
+*Deployment scheduling reserved for future development.*
 
 
