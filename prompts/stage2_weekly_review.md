@@ -63,11 +63,15 @@ A table with this week's reading for each indicator, last week's reading, the di
 
 ### B. Portfolio Health Check
 
-Read the attached portfolio_tracker.xlsx. For each position:
+Read the attached portfolio_tracker.xlsx using these sheets:
 
-- Current weight vs target
-- Any active signals (BREACH, TRIM, ADD, STOP LOSS, ENTRY)
-- Whether the signal requires action THIS WEEK or can wait
+- **Holdings** — current weight vs target, cost basis, P&L per position
+- **Rebalance Signals** — drift signals (BREACH/TRIM/ADD/HOLD), shares to trade, est. proceeds
+- **Entry Signals** — P/E score (1–5), stop-loss flags, entry/exit signals
+- **Watchlist** — all pending actions with trigger conditions and dates
+- **Screener** — live valuation + Quadrant D regime-fit for each watchlist ticker
+
+For each position: current weight vs target, any active signals (BREACH, TRIM, ADD, STOP LOSS, ENTRY), and whether action is required THIS WEEK or can wait.
 
 ### C. Regime-Fit Assessment
 
@@ -76,6 +80,8 @@ For each satellite position, answer: does this position BELONG in Quadrant D? Sc
 - ✅ Regime-fit (hard asset, defense, short duration, pricing power)
 - ⚠️ Neutral (thesis intact but not regime-optimal)
 - ❌ Regime-misfit (high multiple, no FCF, long duration, China-dependent)
+
+Start from the Screener sheet's "Regime Fit" column as a baseline. Override or confirm each score with your macro reasoning — the pipeline scores mechanically; you have context it doesn't.
 
 ### D. Action Recommendations (prioritized)
 
@@ -93,6 +99,14 @@ Is the Quadrant B trigger getting closer? What would need to happen for a regime
 
 Review last week's calls. What played out differently? What should be adjusted?
 
+### G. Watchlist Review
+
+Read the Watchlist sheet. For each open item:
+
+- Has the trigger condition been met? (cross-reference Screener for current price and P/E)
+- Is the action still valid given the current regime?
+- Verdict: **EXECUTE NOW** / **KEEP WAITING** / **CLOSE** (thesis broken)
+
 ---
 
 **IMPORTANT CONSTRAINTS:**
@@ -103,4 +117,4 @@ Review last week's calls. What played out differently? What should be adjusted?
 - If VIX > 35, activate Emergency Protocol (pause all new buys, triage positions)
 - I am not a financial advisor's client — I manage my own portfolio. Your role is analytical, not advisory.
 
-**ATTACHED:** [paste your latest portfolio_tracker.xlsx here]
+**ATTACHED:** portfolio_tracker.xlsx (7 sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals, Audit, Watchlist, Screener)
