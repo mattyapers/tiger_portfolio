@@ -371,3 +371,28 @@ WATCHLIST = {
     'QB_FCX':   {'ticker': 'FCX',   'action': 'WATCH', 'note': 'Quadrant B candidate — copper / critical minerals'},
     'QB_CCJ':   {'ticker': 'CCJ',   'action': 'WATCH', 'note': 'Quadrant B candidate — uranium / nuclear renaissance'},
 }
+
+# ============================================================
+# WATCHLIST REGIME FIT — Quadrant D scoring for screener
+# ============================================================
+# score: ✅ = regime-fit (hard asset, defense, pricing power, short duration)
+#        ⚠️ = neutral (thesis intact but not regime-optimal)
+#        ❌ = regime-misfit (high multiple, no FCF, long duration, China-dependent)
+WATCHLIST_REGIME_FIT = {
+    'BABA': {'score': '❌', 'reason': 'China-dependent; deglobalization conflict'},
+    'XLE':  {'score': '✅', 'reason': 'Energy hedge; stagflation alpha'},
+    'CAT':  {'score': '⚠️', 'reason': 'Industrial compounder; P/E elevated at 41x vs 19x avg'},
+    'MSFT': {'score': '❌', 'reason': 'High multiple; long-duration growth proxy; QB fit not D'},
+    'LMT':  {'score': '✅', 'reason': 'Defense; NATO spending catalyst; FCF compounder'},
+    'EUAD': {'score': '✅', 'reason': 'European defense ETF; NATO rearmament theme'},
+    'DBS':  {'score': '⚠️', 'reason': 'SGD base + ASEAN growth; rate-sensitive NIM compression risk'},
+    'COPX': {'score': '⚠️', 'reason': 'Copper miners; real assets but cyclical in stagflation'},
+    'MRVL': {'score': '❌', 'reason': 'High multiple; no FCF cushion; hold for QB or valuation reset'},
+    'WPM':  {'score': '✅', 'reason': 'Gold/silver streaming; real assets + FCF (no capex risk)'},
+    'MOS':  {'score': '✅', 'reason': 'Fertilizer/potash; food security; inflation-linked commodity'},
+    'LIN':  {'score': '✅', 'reason': 'Pricing power + contractual FCF; industrial gases duopoly'},
+    'ISRG': {'score': '❌', 'reason': 'High multiple; growth; no FCF cushion; QB candidate not D'},
+    'APD':  {'score': '⚠️', 'reason': 'QB candidate; industrial gases; neutral in D pending BS trigger'},
+    'FCX':  {'score': '⚠️', 'reason': 'Copper/critical minerals; real assets but cyclical in stagflation'},
+    'CCJ':  {'score': '⚠️', 'reason': 'Uranium/nuclear; QB candidate; real-asset case in D is weak'},
+}

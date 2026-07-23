@@ -19,6 +19,8 @@ import logging
 import io
 from datetime import datetime
 
+import pandas as pd
+
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning, module='yfinance')
 warnings.filterwarnings('ignore', message='.*utcnow.*')
@@ -51,6 +53,7 @@ from modules.extract import extract_hybrid, extract_yf_only, extract_offline
 from modules.transform import transform_all
 from modules.load import load_to_excel
 from modules.audit import validate_freshness, price_sanity_check
+from modules.screener import run_screener
 from modules.dashboard import generate_html_dashboard
 
 
@@ -110,6 +113,14 @@ def run_pipeline(mode='hybrid'):
             logger.info(f"  💡 Entry opportunities: {', '.join(buys['symbol'].tolist())}")
         if not trims.empty:
             logger.info(f"  🚨 Trim candidates: {', '.join(trims['symbol'].tolist())}")
+
+    # STAGE 2b: SCREENER — watchlist valuation (skipped in offline mode)
+    if mode != 'offline':
+        logger.info("STAGE 2b: Running watchlist screener...")
+        analytics['screener'] = run_screener(settings)
+        logger.info(f"  Screener: {len(analytics['screener'])} tickers")
+    else:
+        analytics['screener'] = pd.DataFrame()
 
     # STAGE 3: LOAD
     logger.info("STAGE 3: Writing to Excel...")

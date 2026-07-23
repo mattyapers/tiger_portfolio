@@ -407,6 +407,125 @@ def write_audit_sheet(wb, audit):
     return ws
 
 
+def write_watchlist_sheet(wb, settings):
+    """Write the WATCHLIST dict to a structured sheet."""
+    ws = wb.create_sheet('👀 Watchlist')
+
+    ws.merge_cells('A1:F1')
+    ws['A1'] = 'WATCHLIST — Pending Actions & Watch Items'
+    ws['A1'].font = TITLE_F
+
+    headers = ['Key', 'Ticker', 'Action', 'Target Price', 'Date', 'Note']
+    _style_header_row(ws, 3, 6, headers)
+
+    from openpyxl.utils import get_column_letter
+    for i, w in enumerate([18, 8, 14, 13, 12, 60], 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    for idx, (key, entry) in enumerate(settings.WATCHLIST.items()):
+        r = 4 + idx
+        ws.cell(row=r, column=1, value=key)
+        ws.cell(row=r, column=2, value=entry.get('ticker', '')).font = BOLD_F
+
+        action = entry.get('action', '—')
+        action_cell = ws.cell(row=r, column=3, value=action)
+        if action in ('EXIT', 'TRIM 50%'):
+            action_cell.fill = ALERT_BG
+        elif action == 'WATCH':
+            action_cell.fill = GOOD_BG
+
+        target = entry.get('target_price')
+        if target is not None:
+            ws.cell(row=r, column=4, value=target).number_format = '$#,##0.00'
+        else:
+            ws.cell(row=r, column=4, value='—')
+
+        date_val = (entry.get('trigger_date') or entry.get('review_date')
+                    or entry.get('catalyst_date') or '—')
+        ws.cell(row=r, column=5, value=date_val)
+
+        note = entry.get('note', '')
+        ws.cell(row=r, column=6, value=note[:200] if note else '').alignment = Alignment(wrap_text=True)
+
+        for c in range(1, 7):
+            ws.cell(row=r, column=c).border = THIN_BORDER
+
+    ws.freeze_panes = 'A4'
+    return ws
+
+
+def write_screener_sheet(wb, screener_df):
+    """Write the watchlist valuation screener results."""
+    ws = wb.create_sheet('🔍 Screener')
+
+    ws.merge_cells('A1:J1')
+    ws['A1'] = 'WATCHLIST SCREENER — Valuation + Regime Fit (Quadrant D)'
+    ws['A1'].font = TITLE_F
+
+    headers = ['Ticker', 'Price', 'P/E TTM', 'Fwd P/E', '5Y Avg P/E',
+               'P/E Premium', 'FCF Yield', 'Regime Fit', 'Regime Note', 'Signal']
+    _style_header_row(ws, 3, 10, headers)
+
+    from openpyxl.utils import get_column_letter
+    for i, w in enumerate([8, 10, 9, 9, 11, 11, 10, 12, 36, 18], 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    if screener_df.empty:
+        ws.cell(row=4, column=1,
+                value='No screener data — run in hybrid or yf-only mode')
+        return ws
+
+    for idx, (_, row) in enumerate(screener_df.iterrows()):
+        r = 4 + idx
+        ws.cell(row=r, column=1, value=row['symbol']).font = BOLD_F
+
+        price = row.get('price')
+        if pd.notna(price) and price is not None:
+            ws.cell(row=r, column=2, value=price).number_format = '$#,##0.00'
+        else:
+            ws.cell(row=r, column=2, value='—')
+
+        for col, field in [(3, 'pe_ttm'), (4, 'fwd_pe'), (5, 'pe_5y_avg')]:
+            val = row.get(field)
+            c = ws.cell(row=r, column=col, value=val if pd.notna(val) and val is not None else '—')
+            if pd.notna(val) and val is not None:
+                c.number_format = '0.0'
+
+        prem = row.get('pe_premium_pct')
+        if pd.notna(prem) and prem is not None:
+            ws.cell(row=r, column=6, value=prem / 100).number_format = '+0.0%;-0.0%'
+        else:
+            ws.cell(row=r, column=6, value='—')
+
+        fcfy = row.get('fcf_yield_pct')
+        if pd.notna(fcfy) and fcfy is not None:
+            ws.cell(row=r, column=7, value=fcfy / 100).number_format = '0.0%'
+        else:
+            ws.cell(row=r, column=7, value='—')
+
+        fit = str(row.get('regime_fit', '—'))
+        fit_cell = ws.cell(row=r, column=8, value=fit)
+        if '✅' in fit:
+            fit_cell.fill = GOOD_BG
+        elif '❌' in fit:
+            fit_cell.fill = ALERT_BG
+
+        ws.cell(row=r, column=9, value=row.get('regime_note', ''))
+
+        sig = str(row.get('signal', ''))
+        sig_cell = ws.cell(row=r, column=10, value=sig)
+        if '🚨' in sig:
+            sig_cell.fill = ALERT_BG
+        elif '💡' in sig:
+            sig_cell.fill = GOOD_BG
+
+        for c in range(1, 11):
+            ws.cell(row=r, column=c).border = THIN_BORDER
+
+    ws.freeze_panes = 'A4'
+    return ws
+
+
 def load_to_excel(analytics, settings):
     """
     Master load function — writes all sheets to Excel.
@@ -452,9 +571,11 @@ def load_to_excel(analytics, settings):
     write_dashboard_sheet(wb, analytics['summary'], settings, analytics['timestamp'])
     if 'audit' in analytics:
         write_audit_sheet(wb, analytics['audit'])
+    write_watchlist_sheet(wb, settings)
+    write_screener_sheet(wb, analytics.get('screener', pd.DataFrame()))
 
-    # Move Dashboard to first position
-    wb.move_sheet('📊 Dashboard', offset=-3)
+    # Move Dashboard to first position (7 sheets total: Holdings + 6 others)
+    wb.move_sheet('📊 Dashboard', offset=-6)
 
     wb.save(settings.OUTPUT_PATH)
     logger.info(f"Excel saved to {settings.OUTPUT_PATH}")
