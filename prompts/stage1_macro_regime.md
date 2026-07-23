@@ -45,3 +45,22 @@ MACRO_REGIME = {
     'b_dist': 'far|approaching|close|triggered',
 }
 ```
+
+Key mapping — rename these keys when pasting into `config/settings.py`:
+
+| Dict key (Stage 1 output) | Key in `settings.py` |
+|---|---|
+| `as_of` | `as_of_date` |
+| `ffr` | `fed_funds_rate` |
+| `bs` | `fed_balance_sheet` |
+| `pce_h` | `pce_headline` |
+| `pce_c` | `pce_core` |
+| `fw_next` | `fedwatch_next_meeting` |
+| `fw_dec` | `fedwatch_dec_cumulative` |
+| `hormuz` | `hormuz_status` |
+| `tariff_122` | `tariff_section_122` |
+| `mas` | `mas_stance` |
+| `inflections` | `open_inflections` |
+| `b_dist` | `quadrant_b_distance` |
+
+Keys not listed (`quadrant`, `regime_label`, `confidence`, `yield_curve`, `vix`, `brent`) are identical in both.
