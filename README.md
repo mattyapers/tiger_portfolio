@@ -3,7 +3,7 @@
 A rules-based portfolio management pipeline for a Singapore-based investor running a Core (68%) / Core-Plus (11%) / Satellite (21%) allocation with a 30-year, 8% CAGR target. Generates both an interactive Excel report and a self-contained HTML dashboard.
 
 **Author:** Matthew  
-**Last Updated:** 2026-07-11  
+**Last Updated:** 2026-07-24  
 **Python:** 3.12+ on Windows  
 
 ---
@@ -47,7 +47,7 @@ main.py (orchestrator)
   │                       └── 4 sheets: Dashboard, Holdings,
   │                           Rebalance Signals, Entry Signals
   │
-  └─ STAGE 3b: dashboard.py ─ fetch technical data (RSI, MAs, 52W range)
+  └─ STAGE 4: dashboard.py ── fetch technical data (RSI, MAs, 52W range)
                              ├─ fetch macro data (CPI, unemployment, yields)
                              └─ generate self-contained HTML dashboard
 ```
@@ -69,11 +69,11 @@ tiger_portfolio/
 │   ├── extract.py           ← Stage 1: Pull data from Tiger + yfinance.
 │   ├── transform.py         ← Stage 2: Calculate metrics, generate signals.
 │   ├── load.py              ← Stage 3: Write Excel workbook.
-│   ├── dashboard.py         ← Stage 3b: Generate HTML portfolio dashboard.
-│   ├── audit.py             ← Data freshness checks.
+│   ├── dashboard.py         ← Stage 4: Generate HTML portfolio dashboard.
+│   ├── audit.py             ← Data freshness + price-drift checks (written to Audit sheet).
 │   └── __init__.py
 ├── output/
-│   ├── portfolio_tracker.xlsx  ← Generated Excel report (4 sheets).
+│   ├── portfolio_tracker.xlsx  ← Generated Excel report (5 sheets).
 │   ├── dashboard.html          ← Generated HTML dashboard (4 sections).
 │   ├── latest_snapshot.json    ← Auto-saved after every hybrid/yf-only run.
 │   └── run_YYYYMMDD_HHMM.log  ← Log file per run.
@@ -108,8 +108,8 @@ The pipeline generates a **self-contained HTML dashboard** (`output/dashboard.ht
 - **Technical Snapshot** — Per holding: 52W high/low, moving averages (50/200-day), RSI (14-day), overbought/oversold flags
 
 **Features:**
-- Self-contained (73KB) — works offline after initial generation
-- No external dependencies (uses Chart.js from free CDN)
+- Near self-contained (~73KB HTML) — works offline after initial generation (loads Chart.js from CDN on first open)
+- Single external dependency: Chart.js via free CDN (inline fallback is inline data)
 - Interactive allocation chart with hover tooltips
 - Color-coded metrics (green for gains, red for losses)
 - Responsive design (desktop/tablet/mobile)
@@ -136,10 +136,10 @@ High-conviction positions get higher targets. The effective cap for breach detec
 
 ### Rebalance Rules (settings.py)
 
-- **3% drift threshold:** Position drifts >3% from target → signal generated
-- **10% hard cap:** No single position >10% of satellite (unless target is higher)
-- **14-day review cycle:** Run the pipeline every 2 weeks minimum
-- **-15% stop-loss:** P&L below -15% from cost → exit signal
+- **3% drift threshold:** Position drifts >3% from target → signal generated (`REBALANCE_RULES['drift_threshold']`)
+- **15% hard cap:** No single position >15% of satellite — raised from 10% to accommodate Tier-1 positions (GLDM, RTX, GOOG) (`REBALANCE_RULES['max_position_pct']`)
+- **14-day review cycle:** Run the pipeline every 2 weeks minimum (`REBALANCE_RULES['review_cycle_days']`)
+- **-15% stop-loss:** P&L below -15% from cost → exit signal (`SIGNAL_RULES['stop_loss_pct']`)
 
 ### Entry/Exit Scoring (1-5, lower = better)
 
@@ -155,9 +155,9 @@ High-conviction positions get higher targets. The effective cap for breach detec
 
 The `MACRO_REGIME` dict in settings.py drives the dashboard. Update it at each 14-day review. The `REGIME_PLAYBOOK` maps each regime to bond duration targets and satellite overrides.
 
-**Current regime (2026-04-18):** Stagflation-Lite + Ceasefire Transition | Quadrant D. Iran ceasefire announced Apr 8; expires Apr 21. Oil $102→$88, VIX 31→18. Defensive positioning (SHY, VTIP, GLDM, RTX) maintained until ceasefire outcome confirmed.
+**Current regime (2026-07-08):** Stagflation-Lite / Hike-Risk, Geopolitical Escalation Re-Igniting | Quadrant D. Hormuz ceasefire (Islamabad MOU, Jun 17) declared "over" by Trump Jul 8 after mutual strikes. PCE 4.07% (May), CPI 4.2% (May), Brent $77.92 (+5.06%) on Hormuz tanker attacks. Defensive positioning maintained (SHY, VTIP, GLDM, RTX).
 
-**Quadrant B watch:** Two conditions required to rotate — (1) Fed balance sheet > $7T upward, (2) rate cut prob > 30%. Condition 2 is close if oil normalizes and PCE falls toward 2.5%. Rotation candidates: ISRG, APD, FCX, CCJ. Do not enter yet.
+**Quadrant B watch:** Two conditions required to rotate — (1) Fed balance sheet > $7T (currently $6.736T, $264B away), (2) rate cut prob > 30% (currently ~15%). Rotation candidates: ISRG, APD, FCX, CCJ. Do not enter yet.
 
 ---
 
@@ -230,15 +230,17 @@ Operational checklists and execution plans live in Notion under the Investing wo
 
 ---
 
-## Pending Actions (as of 2026-04-18)
+## Pending Actions (as of 2026-07-08)
+
+See `WATCHLIST` in `config/settings.py` for the authoritative list. Key open items:
 
 | Priority | Ticker | Action | Condition |
 |----------|--------|--------|-----------|
-| URGENT | BABA | Exit (stop-loss -15.8%) | Execute immediately. Redeploy to GLDM or AON. |
-| URGENT | XLE | Defer May tranche buy | Wait for Apr 21 ceasefire outcome. Buy if oil >$95, skip if oil <$85. |
-| MONITOR | CAT | Trim 50% | P/E 41x (116% above 5Y avg). Proceeds → AON or MA. |
-| PLAN | May tranche | Revise from SPYD+ONEQ+XLE+KO → SPYD+ONEQ+GLDM+AON | KO already overweight; XLE deferred. |
-| WATCH | Quadrant B | Pre-research ISRG, APD, FCX, CCJ | Do not enter. Trigger: Fed BS >$7T AND cut prob >30%. |
+| OPEN | BABA | Exit (stop-loss -15.8%) | Stop-loss triggered — sell and redeploy to GLDM or AON. |
+| OPEN | XLE | Deferred entry | Thesis weakened at oil <$85; revisit if oil >$95. |
+| OPEN | CAT | Trim 50% | P/E 41x (116% above 5Y avg). Proceeds → AON or MA. Re-entry at $580. |
+| WATCH | MSFT | Entry trigger | Post-Apr 29 earnings: Azure ≥38% + stock >$380 + no lawsuit shock. |
+| WATCH | Quadrant B | Pre-research ISRG, APD, FCX, CCJ | Trigger: Fed BS >$7T AND cut prob >30%. |
 
 ## Future Roadmap
 

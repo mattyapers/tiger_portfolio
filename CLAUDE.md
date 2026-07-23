@@ -45,8 +45,9 @@ Artifacts: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `outp
 ├── modules/
 │   ├── extract.py          # Stage 1 (hybrid / yf-only / offline)
 │   ├── transform.py        # Stage 2 (pure data, no I/O)
-│   ├── load.py             # Stage 3 (Excel via openpyxl)
-│   └── dashboard.py        # Stage 4 (HTML, Chart.js CDN)
+│   ├── load.py             # Stage 3 (Excel via openpyxl — 5 sheets including Audit)
+│   ├── dashboard.py        # Stage 4 (HTML, Chart.js CDN)
+│   └── audit.py            # Data freshness + price-drift checks (called by transform)
 ├── config/
 │   └── settings.py         # All tunables + credential refs
 └── output/
@@ -74,7 +75,7 @@ Sequential stages called by `main.py`:
 
 1. **Extract** (`modules/extract.py`) — `extract_hybrid()` authenticates with Tiger (RSA-signed), fetches positions, overlays live prices + P/E from yfinance. Auto-fixes fractional share inflation (`real_shares = tiger_market_value / yf_price`). `extract_yf_only()` uses snapshot/hardcoded shares + yfinance. `extract_offline()` loads `output/latest_snapshot.json`, falls back to `_extract_hardcoded()`. Saves snapshot.
 2. **Transform** (`modules/transform.py`) — Pure data. Produces tier classification (`Core` / `Core-Bond` / `Core-Plus` / `Satellite`), weights and drift vs targets, rebalance signals (`TRIM` / `ADD` / `HOLD` at 3% threshold), macro-regime playbook signals, P/E entry/exit scores (1–5), satellite correlation matrix.
-3. **Load** (`modules/load.py`) — `openpyxl`. Four sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals. Blue = editable inputs; black = Excel formulas; yellow = flags.
+3. **Load** (`modules/load.py`) — `openpyxl`. Five sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals, Audit. Blue = editable inputs; black = Excel formulas; yellow = flags.
 4. **Dashboard** (`modules/dashboard.py`) — Self-contained HTML with Portfolio Overview (doughnut), Stock Deep-Dive Cards, Macro Monitor (CPI, PCE, unemployment, Fed funds, GDP, Treasury yields 10Y/2Y, yield curve, DXY), Technical Snapshot (52W H/L, distance, 50/200 MA, RSI 14, flags). Inline CSS/JS + data-source appendix + investment disclaimer. Reads `output/latest_snapshot.json`.
 
 ---
@@ -89,7 +90,8 @@ Key fields:
 - `SATELLITE_TARGETS` (per-ticker weights within satellite sleeve)
 - `MACRO_REGIME`: `regime` (active playbook key: `Stagflation` / `Growth/LowInflation` / `Recession/Deflation` / `Risk-Off/Transition`), `last_updated`, `vix`, `pce`, `notes` — update manually every 14 days
 - `REGIME_PLAYBOOK`: regime definitions (`bond_sleeve`, `bond_duration_target`, `satellite_overrides`)
-- `SIGNAL_RULES`: P/E thresholds, stop-loss/take-profit, `drift_threshold` (3%), `max_position_pct` (10%), `review_cycle_days` (14)
+- `REBALANCE_RULES`: `drift_threshold` (3%), `max_position_pct` (15% — raised for Tier-1 positions), `review_cycle_days` (14)
+- `SIGNAL_RULES`: P/E thresholds (`pe_max`, `pe_premium_trim`), `stop_loss_pct` (-15%), `take_profit_pct`
 - `PE_5Y_AVERAGES`: refresh quarterly
 - `WATCHLIST`: pending actions; resolve each cycle
 - `SNAPSHOT_DATE`: display label in Excel header
