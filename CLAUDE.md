@@ -46,7 +46,8 @@ Artifacts: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `outp
 ├── modules/
 │   ├── extract.py          # Stage 1 (hybrid / yf-only / offline)
 │   ├── transform.py        # Stage 2 (pure data, no I/O)
-│   ├── load.py             # Stage 3 (Excel via openpyxl — 5 sheets including Audit)
+│   ├── screener.py         # Stage 2b (WATCHLIST yfinance fetch + regime-fit scoring)
+│   ├── load.py             # Stage 3 (Excel via openpyxl — 7 sheets)
 │   ├── dashboard.py        # Stage 4 (HTML, Chart.js CDN)
 │   └── audit.py            # Data freshness + price-drift checks (called by transform)
 ├── config/
@@ -80,7 +81,8 @@ Sequential stages called by `main.py`:
 
 1. **Extract** (`modules/extract.py`) — `extract_hybrid()` authenticates with Tiger (RSA-signed), fetches positions, overlays live prices + P/E from yfinance. Auto-fixes fractional share inflation (`real_shares = tiger_market_value / yf_price`). `extract_yf_only()` uses snapshot/hardcoded shares + yfinance. `extract_offline()` loads `output/latest_snapshot.json`, falls back to `_extract_hardcoded()`. Saves snapshot.
 2. **Transform** (`modules/transform.py`) — Pure data. Produces tier classification (`Core` / `Core-Bond` / `Core-Plus` / `Satellite`), weights and drift vs targets, rebalance signals (`TRIM` / `ADD` / `HOLD` at 3% threshold), macro-regime playbook signals, P/E entry/exit scores (1–5), satellite correlation matrix.
-3. **Load** (`modules/load.py`) — `openpyxl`. Five sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals, Audit. Blue = editable inputs; black = Excel formulas; yellow = flags.
+2b. **Screener** (`modules/screener.py`) — `run_screener()` extracts unique tickers from `WATCHLIST`, fetches live yfinance data (price, trailing P/E, forward P/E, FCF yield), computes P/E premium vs `PE_5Y_AVERAGES`, and scores each ticker against `WATCHLIST_REGIME_FIT` for Quadrant D fit. Skipped in `--offline` mode; returns empty DataFrame.
+3. **Load** (`modules/load.py`) — `openpyxl`. Seven sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals, Audit, Watchlist, Screener. Blue = editable inputs; black = Excel formulas; yellow = flags.
 4. **Dashboard** (`modules/dashboard.py`) — Self-contained HTML with Portfolio Overview (doughnut), Stock Deep-Dive Cards, Macro Monitor (CPI, PCE, unemployment, Fed funds, GDP, Treasury yields 10Y/2Y, yield curve, DXY), Technical Snapshot (52W H/L, distance, 50/200 MA, RSI 14, flags). Inline CSS/JS + data-source appendix + investment disclaimer. Reads `output/latest_snapshot.json`.
 
 ---
@@ -98,7 +100,8 @@ Key fields:
 - `REBALANCE_RULES`: `drift_threshold` (3%), `max_position_pct` (15% — raised for Tier-1 positions), `review_cycle_days` (14)
 - `SIGNAL_RULES`: P/E thresholds (`pe_max`, `pe_premium_trim`), `stop_loss_pct` (-15%), `take_profit_pct`
 - `PE_5Y_AVERAGES`: refresh quarterly
-- `WATCHLIST`: pending actions; resolve each cycle
+- `WATCHLIST`: pending actions; resolve each cycle. Each entry: `ticker`, `action`, `note`, optional `target_price` / `trigger_date` / `review_date` / `catalyst_date`
+- `WATCHLIST_REGIME_FIT`: per-ticker Quadrant D scoring for `screener.py` — `{'score': '✅|⚠️|❌', 'reason': '...'}`. Update when regime or thesis changes.
 - `SNAPSHOT_DATE`: display label in Excel header
 
 ---
@@ -125,6 +128,7 @@ Key fields:
 | `entry_signals` | DataFrame | `symbol`, `entry_signal` |
 | `bond_duration` | dict | `current_duration`, `target_duration`, `duration_gap` |
 | `satellite_corr` | DataFrame | Correlation matrix |
+| `screener` | DataFrame | WATCHLIST tickers: `symbol`, `price`, `pe_ttm`, `fwd_pe`, `pe_5y_avg`, `pe_premium_pct`, `fcf_yield_pct`, `regime_fit`, `regime_note`, `signal`. Empty in `--offline` mode. |
 
 ---
 
@@ -134,6 +138,7 @@ Run the three-stage prompt workflow first (see [Prompts Directory](#prompts-dire
 - [ ] `MACRO_REGIME` — paste the dict output from Stage 1 prompt
 - [ ] `PE_5Y_AVERAGES` — quarterly refresh
 - [ ] `WATCHLIST` — resolve/add actions
+- [ ] `WATCHLIST_REGIME_FIT` — update scores if regime or thesis changes
 - [ ] `SNAPSHOT_DATE` — if fresh snapshot
 
 After removing a position:

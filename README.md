@@ -3,7 +3,7 @@
 A rules-based portfolio management pipeline for a Singapore-based investor running a Core (68%) / Core-Plus (11%) / Satellite (21%) allocation with a 30-year, 8% CAGR target. Generates both an interactive Excel report and a self-contained HTML dashboard.
 
 **Author:** Matthew  
-**Last Updated:** 2026-07-24 (prompts directory added)  
+**Last Updated:** 2026-07-24 (Watchlist + Screener sheets added)  
 **Python:** 3.12+ on Windows  
 
 ---
@@ -43,9 +43,14 @@ main.py (orchestrator)
   │                        ├─ generate rebalance signals
   │                        └─ score entry/exit opportunities
   │
+  ├─ STAGE 2b: screener.py ─ fetch WATCHLIST tickers from yfinance
+  │                        ├─ score P/E vs 5Y avg + FCF yield
+  │                        └─ score Quadrant D regime fit (skipped offline)
+  │
   ├─ STAGE 3: load.py ───── write Excel (formulas, not hardcodes)
-  │                       └── 4 sheets: Dashboard, Holdings,
-  │                           Rebalance Signals, Entry Signals
+  │                       └── 7 sheets: Dashboard, Holdings, Rebalance
+  │                           Signals, Entry Signals, Audit, Watchlist,
+  │                           Screener
   │
   └─ STAGE 4: dashboard.py ── fetch technical data (RSI, MAs, 52W range)
                              ├─ fetch macro data (CPI, unemployment, yields)
@@ -68,12 +73,13 @@ tiger_portfolio/
 ├── modules/
 │   ├── extract.py           ← Stage 1: Pull data from Tiger + yfinance.
 │   ├── transform.py         ← Stage 2: Calculate metrics, generate signals.
+│   ├── screener.py          ← Stage 2b: Fetch + score WATCHLIST tickers (skipped offline).
 │   ├── load.py              ← Stage 3: Write Excel workbook.
 │   ├── dashboard.py         ← Stage 4: Generate HTML portfolio dashboard.
 │   ├── audit.py             ← Data freshness + price-drift checks (written to Audit sheet).
 │   └── __init__.py
 ├── output/
-│   ├── portfolio_tracker.xlsx  ← Generated Excel report (5 sheets).
+│   ├── portfolio_tracker.xlsx  ← Generated Excel report (7 sheets).
 │   ├── dashboard.html          ← Generated HTML dashboard (4 sections).
 │   ├── latest_snapshot.json    ← Auto-saved after every hybrid/yf-only run.
 │   └── run_YYYYMMDD_HHMM.log  ← Log file per run.
@@ -83,6 +89,24 @@ tiger_portfolio/
 │   └── stage2_weekly_review.md    ← Paste into Claude: full weekly portfolio review (attach xlsx).
 └── README.md                ← You are here.
 ```
+
+---
+
+## Excel Sheets
+
+`output/portfolio_tracker.xlsx` contains 7 sheets, written in this order:
+
+| Sheet | Source | Purpose |
+|-------|--------|---------|
+| 📊 Dashboard | transform + settings | Tier weights, P&L summary, macro regime, next review date |
+| 📈 Holdings | extract + transform | All positions — price (blue/editable), shares, P&L, weight vs target |
+| ⚖️ Rebalance Signals | transform | Satellite drift signals: TRIM/ADD/HOLD, shares to trade, est. proceeds |
+| 🎯 Entry Signals | transform | P/E scoring (1–5), stop-loss flags, entry/exit signals per position |
+| 📋 Audit | audit | Data freshness table + price drift vs snapshot (>10% flagged) |
+| 👀 Watchlist | settings.WATCHLIST | All pending actions — action, target price, date, note; EXIT/TRIM highlighted red |
+| 🔍 Screener | screener + yfinance | WATCHLIST tickers: P/E TTM, Fwd P/E, 5Y avg, premium, FCF yield, Quadrant D regime fit |
+
+The **Screener** sheet is populated in hybrid and yf-only modes. In `--offline` mode it renders empty with a notice.
 
 ---
 
@@ -192,6 +216,13 @@ The `MACRO_REGIME` dict in settings.py drives the dashboard. Update it at each 1
 4. Add display name to `name_map` dict in load.py
 5. Run pipeline to verify
 
+### Adding a ticker to the Watchlist
+
+1. Add entry to `WATCHLIST` in settings.py (fields: `ticker`, `action`, `note`, optional `target_price` / `trigger_date`)
+2. Add a `WATCHLIST_REGIME_FIT` entry: `{'score': '✅|⚠️|❌', 'reason': '...'}`
+3. If it has a 5Y P/E average available: add to `PE_5Y_AVERAGES`
+4. Run pipeline — ticker will appear in the Watchlist and Screener sheets automatically
+
 ---
 
 ## Weekly Review Workflow
@@ -291,6 +322,8 @@ See `WATCHLIST` in `config/settings.py` for the authoritative list. Key open ite
 ## Future Roadmap
 
 - [x] HTML dashboard with 4 integrated sections (Portfolio Overview, Stock Cards, Macro Monitor, Technical)
+- [x] Watchlist sheet — renders WATCHLIST dict with action, target price, date, note
+- [x] Screener sheet — WATCHLIST valuation + Quadrant D regime-fit scoring
 - [ ] Deploy to Synology NAS for automated daily runs
 - [ ] Add correlation matrix sheet to Excel output
 - [ ] Bond duration calculator sheet
