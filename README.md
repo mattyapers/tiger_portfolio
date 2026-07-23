@@ -3,7 +3,7 @@
 A rules-based portfolio management pipeline for a Singapore-based investor running a Core (68%) / Core-Plus (11%) / Satellite (21%) allocation with a 30-year, 8% CAGR target. Generates both an interactive Excel report and a self-contained HTML dashboard.
 
 **Author:** Matthew  
-**Last Updated:** 2026-07-24  
+**Last Updated:** 2026-07-24 (prompts directory added)  
 **Python:** 3.12+ on Windows  
 
 ---
@@ -77,6 +77,10 @@ tiger_portfolio/
 │   ├── dashboard.html          ← Generated HTML dashboard (4 sections).
 │   ├── latest_snapshot.json    ← Auto-saved after every hybrid/yf-only run.
 │   └── run_YYYYMMDD_HHMM.log  ← Log file per run.
+├── prompts/
+│   ├── stage0_freshness_check.md  ← Paste into Claude: staleness triage (no web search).
+│   ├── stage1_macro_regime.md     ← Paste into Claude: fetch macro data + generate MACRO_REGIME dict.
+│   └── stage2_weekly_review.md    ← Paste into Claude: full weekly portfolio review (attach xlsx).
 └── README.md                ← You are here.
 ```
 
@@ -172,12 +176,13 @@ The `MACRO_REGIME` dict in settings.py drives the dashboard. Update it at each 1
 ### 14-day review cycle
 
 1. Run `python main.py`
-2. Review Dashboard sheet: tier drift, macro regime
-3. Review Rebalance Signals: any BREACH/TRIM/ADD?
-4. Review Entry Signals: any score 1 (entry) or score 5 (trim)?
-5. Update `MACRO_REGIME` in settings.py if conditions changed
-6. Check `WATCHLIST` in settings.py for pending actions (exits, deferrals, triggers)
-7. Log decisions in Notion checklist
+2. Run the three-stage Claude review (see [Weekly Review Workflow](#weekly-review-workflow) below)
+3. Paste updated `MACRO_REGIME` dict from Stage 1 into `config/settings.py`
+4. Review Dashboard sheet: tier drift, macro regime
+5. Review Rebalance Signals: any BREACH/TRIM/ADD?
+6. Review Entry Signals: any score 1 (entry) or score 5 (trim)?
+7. Check `WATCHLIST` in settings.py for pending actions (exits, deferrals, triggers)
+8. Log decisions in Notion checklist
 
 ### Adding a new ticker
 
@@ -186,6 +191,45 @@ The `MACRO_REGIME` dict in settings.py drives the dashboard. Update it at each 1
 3. If satellite: add `PE_5Y_AVERAGES` entry
 4. Add display name to `name_map` dict in load.py
 5. Run pipeline to verify
+
+---
+
+## Weekly Review Workflow
+
+The `prompts/` directory contains three Claude prompts that form a structured review pipeline. Run them in order each cycle (Sunday evening or Monday morning).
+
+| Stage | File | Purpose | Inputs | Outputs |
+|-------|------|---------|--------|---------|
+| **Stage 0** | `stage0_freshness_check.md` | Staleness triage | `DATA_FRESHNESS` dict, `MACRO_REGIME['as_of_date']`, last log timestamp | ✅/⚠️/🚨 verdict, carry-forward 🔴 items |
+| **Stage 1** | `stage1_macro_regime.md` | Macro data fetch | Web search (Brent, VIX, FedWatch, H.4.1, PCE, yields, Hormuz, Sec122, MAS) | Regime call + paste-ready `MACRO_REGIME` dict |
+| **Stage 2** | `stage2_weekly_review.md` | Full portfolio review | Stage 1 regime + attached `portfolio_tracker.xlsx` | Scorecard, health check, regime-fit, action plan |
+
+### How to run
+
+**Stage 0** (no internet needed — deterministic):
+1. Open a new Claude conversation
+2. Paste the full contents of `prompts/stage0_freshness_check.md`
+3. Append the `DATA_FRESHNESS` dict and `MACRO_REGIME` block from `config/settings.py`
+4. If verdict is RED: update stale fields in `settings.py` before continuing
+
+**Stage 1** (requires web search):
+1. Open a new Claude conversation
+2. Paste the full contents of `prompts/stage1_macro_regime.md`
+3. Copy the output `MACRO_REGIME` dict into `config/settings.py` → rerun `python main.py`
+
+**Stage 2** (requires the Excel output):
+1. Open a new Claude conversation
+2. Paste the full contents of `prompts/stage2_weekly_review.md`
+3. Update the `## CURRENT REGIME` block with the Stage 1 regime call
+4. Attach `output/portfolio_tracker.xlsx`
+
+### Stage 0 verdict logic
+
+| Verdict | Meaning | Action |
+|---------|---------|--------|
+| GREEN | All data fresh | Skip to Stage 1 |
+| YELLOW | Some items due soon | Run Stage 1, then Stage 2 |
+| RED | Stale data present | Update `settings.py` first, then rerun pipeline |
 
 ---
 
