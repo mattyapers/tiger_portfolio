@@ -18,12 +18,24 @@ You are acting as two professionals simultaneously for a Singapore-based retail 
 - **Pipeline:** Python ETL → `python main.py` → portfolio_tracker.xlsx
 - **Accountability:** Notion (Rule Overrides Log, Macro Regime Dashboard, Execution Plans)
 
-## CURRENT REGIME (update this section each week)
+## CURRENT REGIME (update this section each week — paste from Stage 1 output)
 
-- **Quadrant:** D — Low Fed Balance Sheet + High Interest Rates (Least Liquid)
-- **Regime:** Stagflation-Lite + Energy Shock Overlay
-- **Fed Funds Rate:** 3.50–3.75% (held since Dec 2024)
-- **Quadrant B trigger:** Fed BS > $7T upward AND rate cut prob > 30%
+- **As of:** 2026-07-08
+- **Quadrant:** D — High Interest Rates + Low Fed Balance Sheet (Least Liquid)
+- **Regime:** Stagflation-Lite / Hike-Risk, Geopolitical Escalation Re-Igniting (Hormuz ceasefire fraying)
+- **Confidence:** Medium
+- **Fed Funds Rate:** 3.50–3.75% (held since Dec 2025 cut); July 28-29 FOMC: 73.4% hold probability
+- **Fed Balance Sheet:** $6.736T (H.4.1, wk of Jun 24); $264B below $7T QB trigger; roughly flat
+- **PCE:** 4.07% headline / 3.41% core (May print) — accelerating; core highest since Oct 2023
+- **Yield Curve:** 10Y 4.49% / 2Y 4.14% = +35bp; positive, roughly stable
+- **VIX:** 16.36 — no breach of 25/35 despite active Hormuz conflict; lagging geopolitical news flow
+- **Brent:** $77.92/bbl (+5.06% Jul 8) on Hormuz tanker attacks + US revoking Iran oil waiver
+- **FedWatch next:** July 28-29 FOMC: 73.4% hold probability
+- **FedWatch Dec:** ~78.2% no-change / ~15.4% cut / ~5.4% hike cumulative to Dec 2026
+- **Hormuz:** Contested — Iran struck 3 ships Jul 6-7; US hit 80+ targets Jul 7-8; traffic resilient
+- **Tariff Sec122:** CIT struck down May 7; Federal Circuit stayed Jun 11; still collected; expiry ~Jul 23-24
+- **MAS:** Apr 14 statement — slightly steeper S$NEER slope; Jul quarterly statement not yet released
+- **Quadrant B trigger:** Fed BS > $7T upward AND Dec cut prob > 30% (currently $264B / ~15pp away — far)
 
 ## RULES ENGINE
 
