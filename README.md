@@ -3,7 +3,7 @@
 A rules-based portfolio management pipeline for a Singapore-based investor running a Core (68%) / Core-Plus (11%) / Satellite (21%) allocation with a 30-year, 8% CAGR target. Generates both an interactive Excel report and a self-contained HTML dashboard.
 
 **Author:** Matthew  
-**Last Updated:** 2026-07-24 (Watchlist + Screener sheets added)  
+**Last Updated:** 2026-07-24 (Watchlist + Screener verified)  
 **Python:** 3.12+ on Windows  
 
 ---
@@ -106,7 +106,7 @@ tiger_portfolio/
 | 👀 Watchlist | settings.WATCHLIST | All pending actions — action, target price, date, note; EXIT/TRIM highlighted red |
 | 🔍 Screener | screener + yfinance | WATCHLIST tickers: P/E TTM, Fwd P/E, 5Y avg, premium, FCF yield, Quadrant D regime fit |
 
-The **Screener** sheet is populated in hybrid and yf-only modes. In `--offline` mode it renders empty with a notice.
+The **Screener** sheet is populated in hybrid and yf-only modes. In `--offline` mode it renders empty with a notice. Tickers without a `PE_5Y_AVERAGES` entry show `—` for premium — the row still renders. Tickers that fail yfinance fetch show `ERR` in the Signal column. Verified with 16 watchlist tickers.
 
 ---
 
@@ -220,8 +220,8 @@ The `MACRO_REGIME` dict in settings.py drives the dashboard. Update it at each 1
 
 1. Add entry to `WATCHLIST` in settings.py (fields: `ticker`, `action`, `note`, optional `target_price` / `trigger_date`)
 2. Add a `WATCHLIST_REGIME_FIT` entry: `{'score': '✅|⚠️|❌', 'reason': '...'}`
-3. If it has a 5Y P/E average available: add to `PE_5Y_AVERAGES`
-4. Run pipeline — ticker will appear in the Watchlist and Screener sheets automatically
+3. If a 5Y P/E average is available: add to `PE_5Y_AVERAGES` (optional — omitting shows `—` for premium, row still renders)
+4. Run pipeline — ticker appears in Watchlist and Screener sheets automatically
 
 ---
 
