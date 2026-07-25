@@ -256,6 +256,18 @@ The `prompts/` directory contains three Claude prompts that form a structured re
 3. Update the `## CURRENT REGIME` block with the Stage 1 regime call
 4. Attach `output/portfolio_tracker.xlsx`
 
+### Supplementary Finance Skills
+
+These are global Claude Code plugins (user scope — available in every session, not a Python dependency, not part of this repo). They supplement the Stage 0/1/2 workflow above; `prompts/*.md` stay static and unmodified.
+
+| Plugin | Source | Helps with |
+|---|---|---|
+| `finance-market-analysis` | `himself65/finance-skills` | DCF/relative/SOTP valuation, earnings preview/recap, ETF premium-discount — use when refreshing `PE_5Y_AVERAGES` instead of manual Macrotrends web search |
+| `financial-analysis` | `claude-for-financial-services` | Core DCF/comps/LBO/3-statement modeling primitives underlying the verticals below |
+| `equity-research` | `claude-for-financial-services` | `/comps`, `/earnings` — resolving `WATCHLIST` catalyst items (e.g. `MSFT_WATCH` Azure-growth check, `CAT_TRIM` thesis re-check) |
+| `wealth-management` | `claude-for-financial-services` | Client-review/reporting skills — maps onto Stage 2's Portfolio Health Check and Action Recommendations sections |
+| `investment-banking` | `claude-for-financial-services` | Pitch decks, comps/LBO, transaction management — installed but lower relevance to a personal portfolio tracker |
+
 ### Stage 0 verdict logic
 
 | Verdict | Meaning | Action |

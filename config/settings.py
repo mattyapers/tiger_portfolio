@@ -111,52 +111,52 @@ SIGNAL_RULES = {
 }
 
 # ============================================================
-# 5-YEAR AVERAGE P/E RATIOS (updated March 2026)
+# 5-YEAR AVERAGE P/E RATIOS (updated 2026-07-24)
 # ============================================================
 PE_5Y_AVERAGES = {
     'GOOG': 25.0,
-    'RTX':  22.0,
-    'NVDA': 55.0,
-    'TSM':  22.0,
-    'AAPL': 28.0,
+    'RTX':  33.0,   # Revised up from 22.0 — Jul 2026 refresh (macrotrends/financecharts cluster ~33)
+    'NVDA': 65.0,   # Revised up from 55.0 — cluster 62-69
+    'TSM':  23.0,
+    'AAPL': 30.0,
     'MA':   36.0,
-    'CAT':  19.0,
-    'KO':   24.0,
-    'BABA': 15.0,
-    'AON':  25.0,
-    'COP':  13.0,   # Energy cyclical — 5Y avg depressed by 2020 crash
-    'NTR':  14.0,   # Potash/fertilizer — commodity cycle average
+    'CAT':  20.0,   # Cluster 18-24 across sources; diluted-EPS variant ~24
+    'KO':   25.5,
+    'BABA': 15.0,   # Unresolved — no clean 5Y avg found this refresh, kept prior value
+    'AON':  25.0,   # Unresolved — no clean 5Y avg found this refresh, kept prior value
+    'COP':  14.0,   # Energy cyclical — 5Y avg depressed by 2020 crash
+    'NTR':  34.0,   # Revised up from 14.0 — Jul 2026 refresh (prior value looks stale)
 }
 
 # ============================================================
-# MACRO REGIME — Updated 2026-06-06
+# MACRO REGIME — Updated 2026-07-24
 # ============================================================
 MACRO_REGIME = {
-    'as_of_date': '2026-07-08',
+    'as_of_date': '2026-07-24',
     'quadrant': 'D',
-    'regime_label': 'Stagflation-Lite / Hike-Risk, Geopolitical Escalation Re-Igniting (Hormuz ceasefire fraying)',
-    'confidence': 'medium',
-    'fed_funds_rate': '3.50–3.75% (held since Dec 2025 cut); July 28-29 FOMC: 73.4% hold probability (Jul 7 print)',
-    'fed_balance_sheet': '$6.736T total assets (H.4.1, wk of Jun 24, released Jul 2); $264B below $7T QB trigger; roughly flat',
-    'pce_headline': '4.07% YoY (May print, released Jun 25) — accelerating',
-    'pce_core': '3.41% YoY (May print) — highest since Oct 2023',
-    'cpi_latest': '4.2% YoY headline / 2.9% core (May print, released Jun 10); energy +23.5% YoY, gasoline +40.5%; June print due Jul 14',
+    'regime_label': 'Stagflation / Hike-Risk Escalating — Hormuz Effectively Closed, Oil Shock Underway',
+    'confidence': 'high',   # Raised from medium — Hormuz closure + Brent/VIX repricing now confirm the regime call
+    'fed_funds_rate': '3.50–3.75% (held since Dec 2025 cut); July 28-29 FOMC: 63.5% hold / ~35-36.5% hike probability (Jul 23 print) — hike risk resurfacing, down from 73.4% hold two weeks prior',
+    'fed_balance_sheet': '$6.736T total assets (H.4.1, wk of Jul 9); $264B below $7T QB trigger; roughly flat (+$7B wk, +$83B YoY)',
+    'pce_headline': 'June print due Jul 30, 2026 (not yet released); Truflation nowcast ~3.7% YoY, cooling slightly from May 4.07%',
+    'pce_core': 'June print due Jul 30, 2026 (not yet released); Truflation nowcast +0.2% MoM / ~3.3% YoY — still elevated',
+    'cpi_latest': '3.5% YoY headline (June print, released Jul 14); prior May print 4.2%/2.9% core',
     'jobs_may': "June payrolls +57k (vs 115k consensus), well below May's downwardly-revised +129k; unemployment 4.2% (participation fell to 61.5%, lowest since Mar 2021) — soft print despite hot inflation",
-    'yield_curve': '10Y 4.49% / 2Y 4.14% (Jul 2 close) = +35bp; positive, roughly stable vs prior weeks',
-    'vix': '16.36, +5.07% (Jul 8) — no breach of 25/35 despite active Hormuz conflict; lagging the geopolitical news flow',
-    'brent': '$77.92/bbl, +5.06% on the day (Jul 8) on Hormuz tanker attacks + US revoking Iran oil waiver',
-    'fedwatch_next_meeting': 'July 28-29 FOMC: 73.4% hold probability (Jul 7 print)',
-    'fedwatch_dec_cumulative': '~78.2% no-change / ~15.4% cut / ~5.4% hike cumulative to Dec 2026 (approximate/illustrative pricing)',
-    'hormuz_status': 'Contested/reopening — Iran struck 3 ships Jul 6-7; US hit 80+ targets in response Jul 7-8; traffic resilient (108 crossings over the weekend) vs 120-140/day pre-war baseline',
-    'tariff_section_122': 'CIT struck down 10% surcharge May 7 (2-1); Federal Circuit stayed ruling Jun 11 pending appeal; tariff still collected; statutory expiry ~Jul 23-24, 2026',
-    'mas_stance': 'Last statement Apr 14 — slightly steeper S$NEER appreciation slope on inflation concerns; next quarterly statement due Jul 2026, not yet released as of Jul 8',
+    'yield_curve': '10Y 4.55% / 2Y 4.18% (Jul 17 close) ≈ +34-37bp; positive, stable range all month',
+    'vix': '18.70, +12.4% (Jul 23 close) — rising, still below 25 breach but repricing fast on Hormuz closure',
+    'brent': '$97-100/bbl (Jul 23-24) — breached $100 intraday Fri for first time in 2 months on Hormuz closure + new Red Sea/Houthi front',
+    'fedwatch_next_meeting': 'July 28-29 FOMC: 63.5% hold / ~35-36.5% hike probability (Jul 23) — down from 73.4% hold reading two weeks ago',
+    'fedwatch_dec_cumulative': '~78.2% no-change / ~15.4% cut / ~5.4% hike cumulative to Dec 2026 (unchanged reading)',
+    'hormuz_status': 'EFFECTIVELY CLOSED (Jul 23) — only 15 ships transited Jul 19 vs ~88/day normal; Iran PGSA declared passage "not possible" Jul 12; IRGC struck Cyprus-flagged container ship Jul 11 (23 crew stranded, 1 missing). Major escalation from "contested/reopening" two weeks ago.',
+    'tariff_section_122': 'Statutory Section 122 duties expire today (Jul 24, 2026); Federal Circuit appeal (CAFC stay since Jun 11) still unresolved, government brief due in July — litigation outcome pending regardless of statutory lapse',
+    'mas_stance': 'No Jul 2026 quarterly statement located yet (MAS issues Jan/Apr/Jul/Oct); last confirmed reading Jan 29, 2026 held steady, raised 2026 inflation outlook to 1-2%. Apr 14 slope-steepening note from prior cycle is stale — verify mas.gov.sg directly.',
     'open_inflections': [
-        'US-Iran ceasefire (Islamabad MOU, signed Jun 17) declared "over" by Trump Jul 8 after mutual strikes — watch for formal collapse vs. talks continuing',
-        'Fed balance sheet vs $7T + Dec cut prob vs 30% — Quadrant B rotation trigger, currently $264B / ~15pp away',
-        'Section 122 tariff appeal outcome before Jul 23-24 statutory expiry',
-        'VIX/Brent repricing lag — equity vol has not yet reflected the Jul 6-8 Hormuz escalation; a catch-up spike could raise regime confidence to High',
-        'MAS July quarterly policy statement — due but not yet released',
-        'June CPI print due Jul 14 — hot read would reinforce hike-risk/D regime lock-in',
+        'Hormuz closure escalation (Jul 11-23) — major regime-confirming shock; watch for de-escalation or a wider Red Sea front',
+        'Fed hike risk resurfacing — 35%+ probability for Jul 29 FOMC, up from near-zero; first live hike discussion since cuts began',
+        'Section 122 tariff statutory expiry today (Jul 24) vs ongoing CAFC appeal — outcome unresolved, watch for new proclamation or lapse',
+        'June PCE report due Jul 30 — will confirm/deny Truflation nowcast (3.7% headline / 3.3% core)',
+        'MAS Jul quarterly statement overdue/unlocated — verify directly, could shift SGD policy read',
+        'Fed BS vs $7T + Dec cut prob vs 30% — Quadrant B rotation trigger, still far ($264B / ~15pp away)',
     ],
     'quadrant_b_distance': 'far',
 }
@@ -205,7 +205,7 @@ NAS_PATH = '/volume1/investments/portfolio_tracker.xlsx'
 # ============================================================
 # SNAPSHOT DATE
 # ============================================================
-SNAPSHOT_DATE = '2026-07-08'
+SNAPSHOT_DATE = '2026-07-24'
 
 # ============================================================
 # DATA FRESHNESS METADATA
@@ -221,13 +221,13 @@ DATA_FRESHNESS = {
         'update_action': 'Run main.py (any mode); bump SNAPSHOT_DATE to today',
     },
     'macro_regime': {
-        'value':         '2026-07-08',
+        'value':         '2026-07-24',
         'cadence_days':  7,
         'label':         'Macro regime block',
         'update_action': 'Update MACRO_REGIME dict + open_inflections in settings.py; bump value here',
     },
     'pe_5y_averages': {
-        'value':         '2026-03-30',
+        'value':         '2026-07-24',
         'cadence_days':  90,
         'label':         '5Y P/E averages (quarterly)',
         'update_action': 'Refresh PE_5Y_AVERAGES from Macrotrends/YF; bump value here',
@@ -239,7 +239,7 @@ DATA_FRESHNESS = {
         'update_action': 'Review SATELLITE_TARGETS for post-trade changes; bump value here',
     },
     'watchlist': {
-        'value':         '2026-05-05',
+        'value':         '2026-07-24',
         'cadence_days':  14,
         'label':         'Watchlist pending actions',
         'update_action': 'Resolve or extend each WATCHLIST entry; bump value here',
@@ -260,9 +260,11 @@ WATCHLIST = {
         'ticker': 'BABA',
         'action': 'EXIT',
         'note': (
-            'STOP-LOSS TRIGGERED: -15.8% loss ($138.59 vs $164.69 cost). '
+            'STOP-LOSS TRIGGERED 2026-04-18: -15.8% loss ($138.59 vs $164.69 cost). '
             'Override log (2026-03-31): "No further overrides on BABA. '
             'Next breach of -15% from current price = execute exit, no exceptions." '
+            '2026-07-24 run: BABA not flagged in this cycle\'s Trim/Entry Signals — check current P&L% on Entry Signals sheet; '
+            'if still below -15% cost basis, override log says execute now, no exceptions. '
             'Sell 1 share (~$138 proceeds). Redeploy into GLDM (underweight) or AON (score 1 entry). '
             'After execution: remove BABA from TICKER_TIERS and SATELLITE_TARGETS.'
         ),
@@ -270,25 +272,23 @@ WATCHLIST = {
     },
     'XLE_DEFERRED': {
         'ticker': 'XLE',
-        'action': 'DEFER',
+        'action': 'ENTRY CONDITION MET',
         'note': (
-            'Original thesis: stagflation + oil >$100 = energy alpha. '
-            'Oil dropped to $88 on Iran ceasefire (Apr 8). Thesis weakened. '
-            'Entry condition: oil spikes back above $95 after ceasefire collapses (watch Apr 21). '
-            'Skip condition: ceasefire converts to deal and oil settles below $85 — '
-            'redirect May tranche ($200) to GLDM or AON instead. '
-            'NOTE: XLE at 0.07 target with no position will generate ADD signals — expected, ignore until resolved.'
+            'Original thesis: stagflation + oil >$100 = energy alpha. Oil dropped to $88 on Iran ceasefire (Apr 8), thesis weakened, deferred. '
+            'TRIGGER HIT 2026-07-24: Hormuz effectively closed (Jul 11-23, only 15 ships transited Jul 19 vs ~88/day normal) + new Houthi Red Sea front. '
+            'Brent breached $100 intraday Jul 23-24, first time in 2 months. Entry condition (oil >$95 post-ceasefire-collapse) satisfied. '
+            'Verify current XLE price/P/E via Screener sheet before sizing; XLE at 0.07 target with no position — resume normal ADD tranches.'
         ),
-        'review_date': '2026-04-21',
+        'review_date': '2026-07-24',
     },
     'CAT_TRIM': {
         'ticker': 'CAT',
         'action': 'TRIM 50%',
         'note': (
-            'P/E 41x vs 19x 5Y avg (116% premium). Score 5 — both trim triggers firing. '
+            'P/E ~48x (Jul 2026) vs revised 5Y avg 20.0 (was 19.0) — still ~140% premium. Score 5 — both trim triggers firing, still active this cycle. '
             'Override on 2026-03-31 was correct (+$80/share gain). '
-            'Recommend trimming 50% at current levels ($773+). '
-            'Proceeds ($94 est.) → AON or MA. Re-entry target: $580.'
+            'Recommend trimming 50% at current levels. Check Entry Signals sheet for live price/P/E. '
+            'Proceeds → AON or MA. Re-entry target: $580.'
         ),
     },
     'CAT_REENTRY': {
@@ -300,10 +300,12 @@ WATCHLIST = {
         'ticker': 'MSFT',
         'target_price': 380,
         'note': (
-            'DO NOT initiate before April 29, 2026 Q3 earnings. '
+            'Catalyst date (2026-04-29 Q3 earnings) has passed — NOT YET RESOLVED, needs manual research this cycle. '
             'Entry requires: Azure Q3 growth >= 38%, '
             'CapEx guidance plateaus, stock holds above $380 post-earnings, '
-            'no adverse OpenAI lawsuit outcome. Target 5-7% satellite if met.'
+            'no adverse OpenAI lawsuit outcome. Target 5-7% satellite if met. '
+            'Also unresolved given current regime: MSFT scored regime-misfit (❌) for Quadrant D in WATCHLIST_REGIME_FIT — '
+            'confirm whether stagflation/hike-risk thesis still argues against entry regardless of earnings outcome.'
         ),
         'catalyst_date': '2026-04-29',
         'entry_condition': 'Azure >= 38% AND stock > $380 post-earnings AND no lawsuit shock',
@@ -319,9 +321,9 @@ WATCHLIST = {
         'note': 'European defense ETF — NATO rearmament',
     },
     'DBS': {
-        'ticker': 'DBS',
+        'ticker': 'D05.SI',   # Fixed 2026-07-24 — bare 'DBS' resolved to Invesco DB Silver Fund on Yahoo/yfinance, wrong instrument
         'target_price': None,
-        'note': 'Singapore bank — SGD base, ASEAN growth',
+        'note': 'Singapore bank — SGD base, ASEAN growth. Price quoted in SGD (SGX-listed), not USD like the rest of the watchlist.',
     },
     'COPX': {
         'ticker': 'COPX',
@@ -385,7 +387,7 @@ WATCHLIST_REGIME_FIT = {
     'MSFT': {'score': '❌', 'reason': 'High multiple; long-duration growth proxy; QB fit not D'},
     'LMT':  {'score': '✅', 'reason': 'Defense; NATO spending catalyst; FCF compounder'},
     'EUAD': {'score': '✅', 'reason': 'European defense ETF; NATO rearmament theme'},
-    'DBS':  {'score': '⚠️', 'reason': 'SGD base + ASEAN growth; rate-sensitive NIM compression risk'},
+    'D05.SI': {'score': '⚠️', 'reason': 'SGD base + ASEAN growth; rate-sensitive NIM compression risk'},
     'COPX': {'score': '⚠️', 'reason': 'Copper miners; real assets but cyclical in stagflation'},
     'MRVL': {'score': '❌', 'reason': 'High multiple; no FCF cushion; hold for QB or valuation reset'},
     'WPM':  {'score': '✅', 'reason': 'Gold/silver streaming; real assets + FCF (no capex risk)'},
