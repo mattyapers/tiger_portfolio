@@ -220,6 +220,40 @@ def calculate_portfolio_overview(snapshot, settings):
     }
 
 
+def calculate_allocation_chart(holdings, settings):
+    """
+    Build the doughnut-chart breakdown.
+
+    Core/Core-Plus book: by individual ticker (no Satellite tier there, so a
+    tier pie is just "Core" vs "Core-Plus" — individual holdings are more useful).
+    Satellite book: by GICS sector (yfinance) — a per-ticker pie is too granular
+    for a 100%-Satellite book where the interesting question is sector concentration.
+    """
+    total = sum(h["shares"] * h["latest_price"] for h in holdings)
+    is_satellite_book = 'Satellite' in settings.TIER_TARGETS
+
+    if is_satellite_book:
+        sector_totals = {}
+        for h in holdings:
+            mv = h["shares"] * h["latest_price"]
+            try:
+                sector = yf.Ticker(h["symbol"]).info.get("sector") or "Unknown"
+            except Exception:
+                sector = "Unknown"
+            sector_totals[sector] = sector_totals.get(sector, 0) + mv
+        ranked = sorted(sector_totals.items(), key=lambda kv: -kv[1])
+        labels = [k for k, _ in ranked]
+        values = [round(v / total * 100, 1) if total > 0 else 0 for _, v in ranked]
+        chart_title = "Allocation by Sector"
+    else:
+        ranked = sorted(holdings, key=lambda h: -(h["shares"] * h["latest_price"]))
+        labels = [h["symbol"] for h in ranked]
+        values = [round((h["shares"] * h["latest_price"]) / total * 100, 1) if total > 0 else 0 for h in ranked]
+        chart_title = "Allocation by Holding"
+
+    return labels, values, chart_title
+
+
 def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json", output_path="output/dashboard.html"):
     """Generate the self-contained HTML dashboard."""
 
@@ -233,6 +267,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     symbols = [h["symbol"] for h in holdings]
     technical = fetch_technical_data(symbols)
     macro = fetch_macro_data()
+    chart_labels, chart_values, chart_title = calculate_allocation_chart(holdings, settings)
     
     # Generate HTML
     html = f"""<!DOCTYPE html>
@@ -504,7 +539,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
                 <div>
-                    <h3 style="font-size: 14px; margin-bottom: 15px;">Allocation by Tier</h3>
+                    <h3 style="font-size: 14px; margin-bottom: 15px;">{chart_title}</h3>
                     <div class="allocation-chart">
                         <canvas id="allocationChart"></canvas>
                     </div>
@@ -692,10 +727,10 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
         new Chart(allocationCtx, {{
             type: 'doughnut',
             data: {{
-                labels: ['Core', 'Core-Plus', 'Satellite'],
+                labels: {chart_labels!r},
                 datasets: [{{
-                    data: [{portfolio['core_pct']:.1f}, {portfolio['coreplus_pct']:.1f}, {portfolio['satellite_pct']:.1f}],
-                    backgroundColor: ['#1f77b4', '#2ca02c', '#ff7f0e'],
+                    data: {chart_values!r},
+                    backgroundColor: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#aec7e8', '#ffbb78', '#98df8a', '#ff9896'],
                     borderColor: '#fff',
                     borderWidth: 2
                 }}]
