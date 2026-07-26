@@ -144,14 +144,17 @@ def fetch_macro_data():
     return macro
 
 
-def calculate_valuation_metrics(snapshot):
+def calculate_valuation_metrics(snapshot, settings):
     """
     Calculate valuation metrics for stock cards.
     For now, uses P/E from snapshot. In full impl, would fetch P/S, P/B, etc.
+
+    Filtered to this book's TICKER_TIERS — see calculate_portfolio_overview().
     """
-    holdings = snapshot.get("holdings", [])
+    tier_map = settings.TICKER_TIERS
+    holdings = [h for h in snapshot.get("holdings", []) if h["symbol"] in tier_map]
     valuation = {}
-    
+
     for holding in holdings:
         symbol = holding["symbol"]
         latest_price = holding["latest_price"]
@@ -168,49 +171,66 @@ def calculate_valuation_metrics(snapshot):
     return valuation
 
 
-def calculate_portfolio_overview(snapshot):
-    """Calculate portfolio-level metrics."""
+def calculate_portfolio_overview(snapshot, settings):
+    """
+    Calculate portfolio-level metrics — filtered to this book's TICKER_TIERS.
+
+    The raw snapshot's "holdings" and "account.total_equity" cover the whole
+    Tiger account (both books combined, since they share one account). Mirror
+    transform.py's classify_tiers(): drop any symbol not in this book's
+    TICKER_TIERS before computing totals, or the satellite dashboard shows
+    Core/Core-Plus value baked into its total (and vice versa).
+    """
     account = snapshot.get("account", {})
-    holdings = snapshot.get("holdings", [])
-    
-    total_equity = account.get("total_equity", 0)
-    total_pnl = account.get("unrealized_pnl", 0)
-    total_pnl_pct = (total_pnl / total_equity * 100) if total_equity > 0 else 0
-    
-    # Calculate allocation by sector (simplified - would use TICKER_TIERS from settings)
-    core_allocation = 0.68
-    satellite_allocation = 0.21
-    bonds_allocation = 0.11
-    
-    # Holdings by allocation
-    core_value = total_equity * core_allocation
-    satellite_value = total_equity * satellite_allocation
-    bonds_value = total_equity * bonds_allocation
-    
+    all_holdings = snapshot.get("holdings", [])
+    tier_map = settings.TICKER_TIERS
+    holdings = [h for h in all_holdings if h["symbol"] in tier_map]
+
+    market_values = [h["shares"] * h["latest_price"] for h in holdings]
+    cost_bases = [h["shares"] * h["avg_cost"] for h in holdings]
+
+    total_equity = sum(market_values)
+    total_cost = sum(cost_bases)
+    total_pnl = total_equity - total_cost
+    total_pnl_pct = (total_pnl / total_cost * 100) if total_cost > 0 else 0
+
+    def tier_value(*tiers):
+        return sum(mv for h, mv in zip(holdings, market_values) if tier_map[h["symbol"]] in tiers)
+
+    core_value = tier_value("Core", "Core-Bond")
+    coreplus_value = tier_value("Core-Plus")
+    satellite_value = tier_value("Satellite")
+
+    core_pct = (core_value / total_equity * 100) if total_equity > 0 else 0
+    coreplus_pct = (coreplus_value / total_equity * 100) if total_equity > 0 else 0
+    satellite_pct = (satellite_value / total_equity * 100) if total_equity > 0 else 0
+
     return {
         "total_equity": round(total_equity, 2),
         "cash": round(account.get("cash_balance", 0), 2),
         "total_pnl": round(total_pnl, 2),
         "total_pnl_pct": round(total_pnl_pct, 2),
         "num_holdings": len(holdings),
-        "core_pct": core_allocation * 100,
-        "satellite_pct": satellite_allocation * 100,
-        "bonds_pct": bonds_allocation * 100,
+        "core_pct": round(core_pct, 1),
+        "coreplus_pct": round(coreplus_pct, 1),
+        "satellite_pct": round(satellite_pct, 1),
         "core_value": round(core_value, 2),
+        "coreplus_value": round(coreplus_value, 2),
         "satellite_value": round(satellite_value, 2),
-        "bonds_value": round(bonds_value, 2),
     }
 
 
-def generate_html_dashboard(snapshot_path="output/latest_snapshot.json", output_path="output/dashboard.html"):
+def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json", output_path="output/dashboard.html"):
     """Generate the self-contained HTML dashboard."""
-    
+
     # Load data
     snapshot = load_snapshot(snapshot_path)
-    portfolio = calculate_portfolio_overview(snapshot)
-    valuation = calculate_valuation_metrics(snapshot)
-    
-    symbols = [h["symbol"] for h in snapshot.get("holdings", [])]
+    portfolio = calculate_portfolio_overview(snapshot, settings)
+    valuation = calculate_valuation_metrics(snapshot, settings)
+
+    tier_map = settings.TICKER_TIERS
+    holdings = [h for h in snapshot.get("holdings", []) if h["symbol"] in tier_map]
+    symbols = [h["symbol"] for h in holdings]
     technical = fetch_technical_data(symbols)
     macro = fetch_macro_data()
     
@@ -492,15 +512,15 @@ def generate_html_dashboard(snapshot_path="output/latest_snapshot.json", output_
                 <div>
                     <div class="metrics-grid">
                         <div class="metric-card">
-                            <div class="metric-label">Core (68%)</div>
+                            <div class="metric-label">Core ({portfolio['core_pct']:.0f}%)</div>
                             <div class="metric-value">${portfolio['core_value']:,.0f}</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-label">Bonds (11%)</div>
-                            <div class="metric-value">${portfolio['bonds_value']:,.0f}</div>
+                            <div class="metric-label">Core-Plus ({portfolio['coreplus_pct']:.0f}%)</div>
+                            <div class="metric-value">${portfolio['coreplus_value']:,.0f}</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-label">Satellite (21%)</div>
+                            <div class="metric-label">Satellite ({portfolio['satellite_pct']:.0f}%)</div>
                             <div class="metric-value">${portfolio['satellite_value']:,.0f}</div>
                         </div>
                     </div>
@@ -514,8 +534,8 @@ def generate_html_dashboard(snapshot_path="output/latest_snapshot.json", output_
             <div class="holdings-grid">
 """
     
-    # Add holding cards
-    for holding in snapshot.get("holdings", []):
+    # Add holding cards — filtered to this book's TICKER_TIERS (see calculate_portfolio_overview)
+    for holding in holdings:
         symbol = holding["symbol"]
         val = valuation.get(symbol, {})
         
@@ -672,9 +692,9 @@ def generate_html_dashboard(snapshot_path="output/latest_snapshot.json", output_
         new Chart(allocationCtx, {{
             type: 'doughnut',
             data: {{
-                labels: ['Core', 'Bonds', 'Satellite'],
+                labels: ['Core', 'Core-Plus', 'Satellite'],
                 datasets: [{{
-                    data: [{portfolio['core_pct']:.1f}, {portfolio['bonds_pct']:.1f}, {portfolio['satellite_pct']:.1f}],
+                    data: [{portfolio['core_pct']:.1f}, {portfolio['coreplus_pct']:.1f}, {portfolio['satellite_pct']:.1f}],
                     backgroundColor: ['#1f77b4', '#2ca02c', '#ff7f0e'],
                     borderColor: '#fff',
                     borderWidth: 2
@@ -706,4 +726,13 @@ def generate_html_dashboard(snapshot_path="output/latest_snapshot.json", output_
 
 
 if __name__ == "__main__":
-    generate_html_dashboard()
+    import sys
+    if '--satellite' in sys.argv[1:]:
+        from config import settings_satellite as _settings
+    else:
+        from config import settings as _settings
+    generate_html_dashboard(
+        _settings,
+        snapshot_path=getattr(_settings, 'SNAPSHOT_PATH', 'output/latest_snapshot.json'),
+        output_path=getattr(_settings, 'DASHBOARD_PATH', 'output/dashboard.html'),
+    )

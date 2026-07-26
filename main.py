@@ -148,6 +148,7 @@ def run_pipeline(mode='hybrid'):
     logger.info("STAGE 3b: Generating HTML dashboard...")
     try:
         dashboard_path = generate_html_dashboard(
+            settings,
             snapshot_path=getattr(settings, 'SNAPSHOT_PATH', 'output/latest_snapshot.json'),
             output_path=getattr(settings, 'DASHBOARD_PATH', 'output/dashboard.html')
         )
