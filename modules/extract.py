@@ -282,7 +282,9 @@ def _save_snapshot(result, settings):
     Auto-save live data to JSON after every hybrid/yf-only run.
     This keeps --offline mode fresh without manual editing.
 
-    File: output/latest_snapshot.json
+    File: settings.SNAPSHOT_PATH (default 'output/latest_snapshot.json') —
+    each settings module (core vs satellite) points at its own file so the
+    two books don't clobber each other's snapshots when run side by side.
     Contains: positions (shares, avg_cost, price, pe) + account summary
     """
     import json
@@ -305,14 +307,14 @@ def _save_snapshot(result, settings):
         })
 
     os.makedirs('output', exist_ok=True)
-    path = 'output/latest_snapshot.json'
+    path = getattr(settings, 'SNAPSHOT_PATH', 'output/latest_snapshot.json')
     with open(path, 'w') as f:
         json.dump(snapshot, f, indent=2)
 
     logger.info(f"Snapshot saved → {path} ({len(snapshot['holdings'])} positions)")
 
 
-def _load_snapshot():
+def _load_snapshot(settings):
     """
     Load the most recent auto-saved snapshot.
     Returns dict or None if no snapshot exists.
@@ -320,7 +322,7 @@ def _load_snapshot():
     import json
     import os
 
-    path = 'output/latest_snapshot.json'
+    path = getattr(settings, 'SNAPSHOT_PATH', 'output/latest_snapshot.json')
     if not os.path.exists(path):
         return None
 
@@ -377,7 +379,7 @@ def extract_offline(settings):
     The snapshot auto-updates every time you run --hybrid or --yf-only,
     so --offline always uses the most recent live data available.
     """
-    snapshot = _load_snapshot()
+    snapshot = _load_snapshot(settings)
     if snapshot:
         logger.info(f"Using auto-snapshot from {snapshot['timestamp']}")
         df = pd.DataFrame(snapshot['holdings'])

@@ -24,6 +24,8 @@ Guide for Claude Code in this repo.
 
 Tiger Portfolio Tracker: Python ETL for automated portfolio management. Tiger Brokers API (Singapore brokerage) + yfinance prices. Calculates allocation drift + macro-regime signals. Writes Excel report (`output/portfolio_tracker.xlsx`) and HTML dashboard (`output/dashboard.html`).
 
+**Split 2026-07-24:** This repo now runs **two books from one codebase**: Core + Core-Plus (default, `config/settings.py`) and Satellite/active-risk (`python main.py --satellite`, `config/settings_satellite.py`). Same Tiger account, same `modules/` code, disjoint `TICKER_TIERS` per book. `modules/transform.py`'s `classify_tiers()` drops anything not in the active book's `TICKER_TIERS` before computing totals — that's what keeps the two books from double-counting each other's positions. Each book has its own `OUTPUT_PATH`/`SNAPSHOT_PATH`/`DASHBOARD_PATH` so running both never overwrites the other's files.
+
 ---
 
 ## Quick Commands
@@ -80,9 +82,9 @@ Python 3.9+. Credentials in `config/`: `tiger_private_key.pem` (RSA private key)
 
 Sequential stages called by `main.py`:
 
-1. **Extract** (`modules/extract.py`) — `extract_hybrid()` authenticates with Tiger (RSA-signed), fetches positions, overlays live prices + P/E from yfinance. Auto-fixes fractional share inflation (`real_shares = tiger_market_value / yf_price`). `extract_yf_only()` uses snapshot/hardcoded shares + yfinance. `extract_offline()` loads `output/latest_snapshot.json`, falls back to `_extract_hardcoded()`. Saves snapshot.
-2. **Transform** (`modules/transform.py`) — Pure data. Produces tier classification (`Core` / `Core-Bond` / `Core-Plus` / `Satellite`), weights + drift vs targets, rebalance signals (`TRIM` / `ADD` / `HOLD` at 3% threshold), macro-regime playbook signals, P/E entry/exit scores (1-5), satellite correlation matrix.
-2b. **Screener** (`modules/screener.py`) — `run_screener()` extracts unique tickers from `WATCHLIST`, fetches live yfinance data (price, trailing P/E, forward P/E, FCF yield), computes P/E premium vs `PE_5Y_AVERAGES`, scores each ticker against `WATCHLIST_REGIME_FIT` for Quadrant D fit. Skipped in `--offline` mode; returns empty DataFrame.
+1. **Extract** (`modules/extract.py`) — `extract_hybrid()` authenticates with Tiger (RSA-signed), fetches positions, overlays live prices + P/E from yfinance. Auto-fixes fractional share inflation (`real_shares = tiger_market_value / yf_price`). `extract_yf_only()` uses snapshot/hardcoded shares + yfinance. `extract_offline()` loads `settings.SNAPSHOT_PATH`, falls back to `_extract_hardcoded()`. Saves snapshot to `settings.SNAPSHOT_PATH` (differs per book).
+2. **Transform** (`modules/transform.py`) — Pure data. Produces tier classification (`Core` / `Core-Bond` / `Core-Plus` in the default book; `Satellite` in the `--satellite` book — the two never coexist since each book's `TICKER_TIERS` only contains its own tickers), weights + drift vs targets, rebalance signals (`TRIM` / `ADD` / `HOLD` at 3% threshold — dormant in the Core/Core-Plus book, no Satellite tier there), macro-regime playbook signals, P/E entry/exit scores (1-5, also dormant in the Core/Core-Plus book). `classify_tiers()` drops any position not in the active book's `TICKER_TIERS` (tier `Unknown`) before totals are computed — this is what lets both books share one Tiger account without double-counting each other's holdings.
+2b. **Screener** (`modules/screener.py`) — `run_screener()` extracts unique tickers from `WATCHLIST`, fetches live yfinance data (price, trailing P/E, forward P/E, FCF yield), computes P/E premium vs `PE_5Y_AVERAGES`, scores each ticker against `WATCHLIST_REGIME_FIT` for Quadrant D fit. Skipped in `--offline` mode; returns empty DataFrame in the Core/Core-Plus book regardless (`WATCHLIST = {}` there).
 3. **Load** (`modules/load.py`) — `openpyxl`. Seven sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals, Audit, Watchlist, Screener. Blue = editable inputs; black = Excel formulas; yellow = flags.
 4. **Dashboard** (`modules/dashboard.py`) — Self-contained HTML with Portfolio Overview (doughnut), Stock Deep-Dive Cards, Macro Monitor (CPI, PCE, unemployment, Fed funds, GDP, Treasury yields 10Y/2Y, yield curve, DXY), Technical Snapshot (52W H/L, distance, 50/200 MA, RSI 14, flags). Inline CSS/JS + data-source appendix + investment disclaimer. Reads `output/latest_snapshot.json`.
 
@@ -90,20 +92,26 @@ Sequential stages called by `main.py`:
 
 ## Configuration
 
-All tunable parameters in @config/settings.py. No hardcoding in modules.
+Two settings modules, same shape, loaded by `main.py` based on the `--satellite` flag. No hardcoding in `modules/` — both books share every module.
 
-Key fields:
-- `TIGER_ID`, `ACCOUNT`, `PRIVATE_KEY_PATH`, `LICENSE`
-- Portfolio: `TIER_TARGETS` (68% Core / 11% Core-Plus / 21% Satellite), `TICKER_TIERS` (mapping; `Core-Bond` sub-tier rolls into Core: BND, IEF, SPTL, SHY, VTIP)
-- `SATELLITE_TARGETS` (per-ticker weights within satellite sleeve)
-- `MACRO_REGIME`: `regime` (active playbook key: `Stagflation` / `Growth/LowInflation` / `Recession/Deflation` / `Risk-Off/Transition`), `last_updated`, `vix`, `pce`, `notes` — update manually every 14 days
-- `REGIME_PLAYBOOK`: regime definitions (`bond_sleeve`, `bond_duration_target`, `satellite_overrides`)
-- `REBALANCE_RULES`: `drift_threshold` (3%), `max_position_pct` (15%), `review_cycle_days` (14)
-- `SIGNAL_RULES`: P/E thresholds (`pe_max`, `pe_premium_trim`), `stop_loss_pct` (-15%), `take_profit_pct`
-- `PE_5Y_AVERAGES`: refresh quarterly
-- `WATCHLIST`: pending actions; resolve each cycle. Each entry: `ticker`, `action`, `note`, optional `target_price` / `trigger_date` / `review_date` / `catalyst_date`
-- `WATCHLIST_REGIME_FIT`: per-ticker Quadrant D scoring for `screener.py` — `{'score': 'yes/maybe/no', 'reason': '...'}`. Update when regime or thesis changes.
-- `SNAPSHOT_DATE`: display label in Excel header
+**`config/settings.py`** (Core/Core-Plus book, default):
+- `TIGER_ID`, `ACCOUNT`, `PRIVATE_KEY_PATH`, `LICENSE` — same Tiger account as `settings_satellite.py`
+- `TIER_TARGETS` (86% Core / 14% Core-Plus — rescaled from the original 68/11 ratio after Satellite got its own book), `TICKER_TIERS` (mapping; `Core-Bond` sub-tier rolls into Core: BND, IEF, SPTL, SHY, VTIP)
+- `SATELLITE_TARGETS`, `PE_5Y_AVERAGES`: kept as **empty dicts**, not deleted — `load.py`/`transform.py` reference them unconditionally regardless of tier content. Real values live in `settings_satellite.py`.
+- `MACRO_REGIME`: same content as `settings_satellite.py`'s copy (both updated together every 14 days) — still relevant here for the Core-Bond duration target
+- `REGIME_PLAYBOOK`: regime definitions (`bond_sleeve`, `bond_duration_target`) — no `satellite_overrides` key here, that lives in `settings_satellite.py`
+- `REBALANCE_RULES`/`SIGNAL_RULES`: kept but **dormant** — they only drive per-position Satellite signals, and this book has no Satellite tier
+- `WATCHLIST` / `WATCHLIST_REGIME_FIT`: intentionally **empty** — passive Core/Core-Plus has no active theses to track
+- `OUTPUT_PATH`/`SNAPSHOT_PATH`/`DASHBOARD_PATH`: `output/portfolio_tracker.xlsx` / `output/latest_snapshot.json` / `output/dashboard.html`
+
+**`config/settings_satellite.py`** (Satellite/risk book, `--satellite`):
+- Same credential fields, same Tiger account
+- `TIER_TARGETS = {'Satellite': 1.00}` — single tier, this book IS the whole risk portfolio
+- `TICKER_TIERS`, `SATELLITE_TARGETS`, `PE_5Y_AVERAGES`: the real per-position config for every active/thesis-driven ticker
+- `REGIME_PLAYBOOK`: only `satellite_overrides` per regime — no bond fields, no bond sleeve in this book
+- `WATCHLIST` / `WATCHLIST_REGIME_FIT`: the full active-thesis list (all entries that used to live in the single blended `settings.py`)
+- `OUTPUT_PATH`/`SNAPSHOT_PATH`/`DASHBOARD_PATH`: `output/satellite_tracker.xlsx` / `output/satellite_snapshot.json` / `output/satellite_dashboard.html` — deliberately different files so running both books never overwrites the other
+- `SNAPSHOT_DATE`: display label in Excel header (both modules have their own)
 
 ---
 
@@ -135,17 +143,21 @@ Key fields:
 
 ## Manual Update Checklist (Every 14-Day Cycle)
 
-Run three-stage prompt workflow first (see [Prompts Directory](#prompts-directory)), then edit @config/settings.py:
+Run three-stage prompt workflow first (see [Prompts Directory](#prompts-directory)), then edit **both** settings modules (`MACRO_REGIME` is duplicated, update both copies together):
+
+`config/settings.py`:
 - [ ] `MACRO_REGIME` — paste dict output from Stage 1 prompt
+- [ ] `SNAPSHOT_DATE` — if fresh snapshot
+
+`config/settings_satellite.py`:
+- [ ] `MACRO_REGIME` — same paste as above
 - [ ] `PE_5Y_AVERAGES` — quarterly refresh
 - [ ] `WATCHLIST` — resolve/add actions
 - [ ] `WATCHLIST_REGIME_FIT` — update scores if regime or thesis changes
 - [ ] `SNAPSHOT_DATE` — if fresh snapshot
 
-After removing a position:
-- [ ] Remove from `TICKER_TIERS`
-- [ ] If satellite: remove from `SATELLITE_TARGETS` and `PE_5Y_AVERAGES`
-- [ ] Delete `WATCHLIST` entry
+After removing a Core/Core-Plus position: remove from `TICKER_TIERS` in `config/settings.py`.
+After removing a Satellite position: remove from `TICKER_TIERS`/`SATELLITE_TARGETS`/`PE_5Y_AVERAGES` in `config/settings_satellite.py`, delete its `WATCHLIST` entry.
 
 ---
 
@@ -177,19 +189,19 @@ Installed globally (user scope, all Claude Code sessions — not project config,
 | `wealth-management` | `claude-for-financial-services` | Client reviews, portfolio analysis, client reporting |
 | `investment-banking` | `claude-for-financial-services` | Pitch decks, comps/LBO, transaction management — installed but not central to this project |
 
-These are a **supplement** to the `prompts/` workflow, not a replacement — `prompts/*.md` stay static/untouched. Reach for these instead of ad hoc web search when:
-- Refreshing `PE_5Y_AVERAGES` (quarterly) — `finance-market-analysis`'s DCF/relative/SOTP triangulation beats scraping Macrotrends by hand (this is how the 2026-07-24 refresh produced two large, uncertain P/E swings for RTX and NTR — a purpose-built valuation tool should give a more defensible number)
-- Resolving `WATCHLIST` catalyst items — `equity-research`'s `/earnings` and comps workflows for things like `MSFT_WATCH`'s Azure-growth check or re-verifying `CAT_TRIM`'s thesis
-- Writing up Stage 2's Portfolio Health Check / Action Recommendations — `wealth-management`'s client-review and reporting skills map onto that deliverable format
+These are a **supplement** to the `prompts/` workflow, not a replacement — `prompts/*.md` stay static/untouched. Most of the concrete use cases below (`PE_5Y_AVERAGES` refresh, `WATCHLIST` catalyst resolution) apply to **`config/settings_satellite.py`**, since that's where those fields live post-split:
+- Refreshing `PE_5Y_AVERAGES` (quarterly, in `settings_satellite.py`) — `finance-market-analysis`'s DCF/relative/SOTP triangulation beats scraping Macrotrends by hand
+- Resolving `WATCHLIST` catalyst items (in `settings_satellite.py`) — `equity-research`'s `/earnings` and comps workflows
+- Writing up Stage 2's Portfolio Health Check / Action Recommendations (either book) — `wealth-management`'s client-review and reporting skills map onto that deliverable format
 
 ---
 
 ## Adding a New Ticker
 
-1. Add to `TICKER_TIERS` in @config/settings.py
-2. If satellite: add to `SATELLITE_TARGETS` (default 0.07)
-3. If satellite: add to `PE_5Y_AVERAGES`
-4. Add display name to `name_map` in @modules/load.py
+For Core/Core-Plus/Core-Bond, edit `config/settings.py`. For a new active/satellite position, edit `config/settings_satellite.py` instead — same steps, different file, plus `SATELLITE_TARGETS`/`PE_5Y_AVERAGES` entries.
+
+1. Add to `TICKER_TIERS` in the relevant settings module (`Core` / `Core-Bond` / `Core-Plus` in `settings.py`; `Satellite` in `settings_satellite.py`)
+2. Add display name to `name_map` in @modules/load.py (shared by both books)
 
 ---
 
@@ -197,11 +209,14 @@ These are a **supplement** to the `prompts/` workflow, not a replacement — `pr
 
 No suite. Dev loop:
 ```bash
-python main.py --yf-only   # ~15s, no keys
-python main.py --offline   # instant
+python main.py --yf-only               # Core/Core-Plus book, ~15s, no keys
+python main.py --offline                # Core/Core-Plus book, instant
+python main.py --satellite --yf-only    # Satellite book, ~15s, no keys
+python main.py --satellite --offline    # Satellite book, instant
 ```
 
-Expected outputs: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `output/run_YYYYMMDD_HHMM.log`. Optional dashboard: `python modules/dashboard.py`.
+Expected outputs (Core/Core-Plus): `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `output/run_core_YYYYMMDD_HHMM.log`.
+Expected outputs (`--satellite`): `output/satellite_tracker.xlsx`, `output/satellite_snapshot.json`, `output/run_satellite_YYYYMMDD_HHMM.log`.
 
 ---
 
@@ -209,16 +224,18 @@ Expected outputs: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`
 
 | Symptom | Fix |
 |---|---|
-| `FileNotFoundError: latest_snapshot.json` | Run `--yf-only` first; check `output/`. |
-| Tiger auth failure | Verify `config/tiger_private_key.pem` and `TIGER_ID`/`ACCOUNT` in @config/settings.py. |
-| Excel `#REF!` | Ticker removed from `TICKER_TIERS` but still referenced; clean mapping. |
-| Dashboard missing data | Ensure `latest_snapshot.json` exists; regenerate if needed. |
+| `FileNotFoundError: latest_snapshot.json` (or `satellite_snapshot.json`) | Run `--yf-only` (add `--satellite` for that book) first; check `output/`. |
+| Tiger auth failure | Verify `config/tiger_private_key.pem` and `TIGER_ID`/`ACCOUNT` — same `.env` drives both settings modules. |
+| Excel `#REF!` | Ticker removed from `TICKER_TIERS` but still referenced; clean mapping in the relevant settings module. |
+| Dashboard missing data | Ensure the book's snapshot file exists (`SNAPSHOT_PATH`); regenerate if needed. |
+| A satellite ticker shows up in the Core/Core-Plus book (or vice versa) | Check `TICKER_TIERS` in both settings modules for an accidental duplicate — should always be disjoint. |
 
 ---
 
 ## Protected Areas
 
 - Do not edit root `extract.py`, `load.py`, `settings.py` (stale). Use `modules/` and `config/`.
-- Do not edit or commit `config/tiger_private_key.pem`.
-- Do not hand-edit `output/latest_snapshot.json` (overwritten by Stage 1).
-- All tunables must remain in @config/settings.py; no hardcoding in modules.
+- Do not edit or commit `config/tiger_private_key.pem` or `.env`.
+- Do not hand-edit `output/latest_snapshot.json` or `output/satellite_snapshot.json` (overwritten each run).
+- All tunables must remain in `config/settings.py` / `config/settings_satellite.py`; no hardcoding in `modules/`.
+- Keep `TICKER_TIERS` disjoint between the two settings modules — a ticker in both would get counted twice across the two books.

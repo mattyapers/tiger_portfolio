@@ -1,8 +1,19 @@
 """
-settings.py — Single source of truth for portfolio rules and API config.
+settings.py — Single source of truth for Core/Core-Plus portfolio rules and API config.
 
 Credentials (TIGER_ID, ACCOUNT, PRIVATE_KEY_PATH, LICENSE) are loaded from .env
 via python-dotenv. The .env file is gitignored. See .env.example for the schema.
+
+SPLIT 2026-07-24: This module now covers Core + Core-Plus only — the
+long-term, passive buy-and-hold sleeve. The former Satellite/active sleeve
+now lives in the sibling module `config/settings_satellite.py`, so the two
+risk books don't get blended into one pie and don't double-count each
+other's positions. Both books point at the same Tiger account and share
+every module in modules/; `main.py --satellite` picks settings_satellite.py
+instead of this file. Each book's classify_tiers() (modules/transform.py)
+drops any position not in its own TICKER_TIERS before computing totals —
+that's the mechanism that keeps the two books from bleeding into each
+other's weight/drift math.
 """
 
 import os
@@ -19,13 +30,14 @@ PRIVATE_KEY_PATH = os.getenv('TIGER_PRIVATE_KEY_PATH', 'config/tiger_private_key
 LICENSE = os.getenv('TIGER_LICENSE', 'TBSG')
 
 # ============================================================
-# PORTFOLIO STRUCTURE — 68/11/21 allocation
+# PORTFOLIO STRUCTURE — Core + Core-Plus only (long-term sleeve)
 # ============================================================
-# Core split: Core (equity) + Core-Bond (fixed income) = 68% total
+# Rescaled from the original 68/11/21 split, dropping Satellite (21%) and
+# redistributing its share proportionally across Core and Core-Plus so the
+# two remaining tiers still sum to 1.00: 68/(68+11)=0.8608, 11/79=0.1392.
 TIER_TARGETS = {
-    'Core': 0.68,
-    'Core-Plus': 0.11,
-    'Satellite': 0.21,
+    'Core': 0.86,
+    'Core-Plus': 0.14,
 }
 
 # Which tickers belong to which tier
@@ -38,63 +50,32 @@ TICKER_TIERS = {
     'SPTL': 'Core-Bond',
     'SHY':  'Core-Bond',
     'VTIP': 'Core-Bond',
-    # 'MSFT': 'Satellite',  # WATCHLIST — uncomment when entry conditions met post-2026-04-29
     'SPYD': 'Core-Plus',
     'ONEQ': 'Core-Plus',
-    'GLDM': 'Satellite',
-    'GOOG': 'Satellite',
-    'RTX':  'Satellite',
-    'NVDA': 'Satellite',
-    'TSM':  'Satellite',
-    'AAPL': 'Satellite',
-    'MA':   'Satellite',
-    'CAT':  'Satellite',
-    'KO':   'Satellite',
-    'BABA': 'Satellite',
-    'AON':  'Satellite',
-    'XLE':  'Satellite',
-    'COP':  'Satellite',   # ConocoPhillips — energy/stagflation thesis
-    'NTR':  'Satellite',   # Nutrien — potash/commodity/food security
 }
 
 # ============================================================
-# TIER DEFINITIONS — Conviction-weighted satellite positioning
+# SATELLITE-ONLY CONFIG — kept as empty dicts, not removed
 # ============================================================
-# Tier-1 (12-15%): Highest conviction, regime-aligned, multi-year hold
-#   → GLDM (inflation hedge), RTX (defense), GOOG (AI/Cloud compounder)
-# Standard (7%): Thesis-driven, full satellite allocation
-#   → NVDA, TSM, AAPL, MA, CAT, AON
-# Reduced (4-5%): Held with lower conviction or partial thesis conflict
-#   → KO (dividend only, no growth edge), BABA (deglobalization conflict)
-# Unallocated buffer: 7% — reserved for opportunistic entries (e.g. MSFT)
-# ============================================================
-SATELLITE_TARGETS = {
-    'GLDM': 0.15,   # Tier-1 — Defensive hedge, stagflation + geopolitical
-    'RTX':  0.15,   # Tier-1 — Defense theme, NATO spending catalyst
-    'GOOG': 0.12,   # Tier-1 — AI + Cloud growth compounder (upgraded from 7%)
-    'NVDA': 0.07,   # Standard — AI infrastructure
-    'TSM':  0.07,   # Standard — Semiconductor / deglobalization thesis
-    'AAPL': 0.07,   # Standard — Consumer tech
-    'MA':   0.07,   # Standard — Payments / cashless economy
-    'CAT':  0.05,   # Reduced — P/E elevated (41x vs 19x avg); hold but cap until reversion
-    'AON':  0.07,   # Standard — Risk management / insurance
-    'KO':   0.03,   # Reduced — Defensive dividend, trim to make room
-    'BABA': 0.01,   # Minimum — Deglobalization conflict, hold/exit candidate
-    'XLE':  0.07,   # Standard — Energy hedge, stagflation alpha
-    'COP':  0.04,   # Small — ConocoPhillips opportunistic, stagflation energy
-    'NTR':  0.03,   # Small — Nutrien potash, food security / commodity
-}
-# Sum = 1.00 — fully allocated (COP/NTR fill former MSFT buffer slot)
-_target_sum = sum(SATELLITE_TARGETS.values())
-assert abs(_target_sum - 1.00) < 0.01, \
-    f"SATELLITE_TARGETS sum {_target_sum:.2f} != 1.00 — check tier allocations"
+# load.py's load_to_excel() and transform.py's score_entry_exit() /
+# generate_rebalance_signals() access these attributes unconditionally
+# (they don't check "does a Satellite tier exist" first) — deleting them
+# outright raises AttributeError even though there are zero Satellite
+# positions in this book. Real values live in config/settings_satellite.py now.
+SATELLITE_TARGETS = {}
+PE_5Y_AVERAGES = {}
 
 # ============================================================
 # REBALANCING RULES
 # ============================================================
+# NOTE: generate_rebalance_signals() in transform.py only produces
+# per-position signals for tier == 'Satellite', which no longer exists in
+# this tracker — these thresholds are dormant here. Tier-level drift
+# (Core/Core-Plus vs target) is still computed via calculate_tier_drift()
+# using the hardcoded 3%/5% bands in transform.py, independent of this dict.
 REBALANCE_RULES = {
     'drift_threshold': 0.03,
-    'max_position_pct': 0.15,    # Raised: Tier-1 positions (GLDM, RTX, GOOG) may hold 12-15%
+    'max_position_pct': 0.15,
     'review_cycle_days': 14,
     'correlation_target': 0.50,
     'correlation_max': 0.75,
@@ -103,6 +84,8 @@ REBALANCE_RULES = {
 # ============================================================
 # ENTRY / EXIT SIGNALS
 # ============================================================
+# NOTE: score_entry_exit() in transform.py only scores tier == 'Satellite'
+# positions — dormant here for the same reason as REBALANCE_RULES above.
 SIGNAL_RULES = {
     'pe_max': 30,
     'pe_premium_trim': 0.25,
@@ -111,26 +94,11 @@ SIGNAL_RULES = {
 }
 
 # ============================================================
-# 5-YEAR AVERAGE P/E RATIOS (updated 2026-07-24)
-# ============================================================
-PE_5Y_AVERAGES = {
-    'GOOG': 25.0,
-    'RTX':  33.0,   # Revised up from 22.0 — Jul 2026 refresh (macrotrends/financecharts cluster ~33)
-    'NVDA': 65.0,   # Revised up from 55.0 — cluster 62-69
-    'TSM':  23.0,
-    'AAPL': 30.0,
-    'MA':   36.0,
-    'CAT':  20.0,   # Cluster 18-24 across sources; diluted-EPS variant ~24
-    'KO':   25.5,
-    'BABA': 15.0,   # Unresolved — no clean 5Y avg found this refresh, kept prior value
-    'AON':  25.0,   # Unresolved — no clean 5Y avg found this refresh, kept prior value
-    'COP':  14.0,   # Energy cyclical — 5Y avg depressed by 2020 crash
-    'NTR':  34.0,   # Revised up from 14.0 — Jul 2026 refresh (prior value looks stale)
-}
-
-# ============================================================
 # MACRO REGIME — Updated 2026-07-24
 # ============================================================
+# Still relevant here: drives Core-Bond duration target via REGIME_PLAYBOOK.
+# Satellite-specific fields (satellite_overrides) live in
+# config/settings_satellite.py now, not here.
 MACRO_REGIME = {
     'as_of_date': '2026-07-24',
     'quadrant': 'D',
@@ -162,37 +130,33 @@ MACRO_REGIME = {
 }
 
 # ============================================================
-# REGIME PLAYBOOK — drives bond duration + satellite overrides
+# REGIME PLAYBOOK — drives Core-Bond duration target
 # ============================================================
 REGIME_PLAYBOOK = {
     'Stagflation': {
         'bond_duration_target': 3.0,   # years, max
         'bond_sleeve': {'SHY': 0.30, 'VTIP': 0.25, 'BND': 0.35, 'IEF': 0.10, 'SPTL': 0.00},
-        'satellite_overrides': {'GLDM': 0.22, 'RTX': 0.18, 'KO': 0.10, 'NVDA': 0.05},
     },
     'Growth/LowInflation': {
         'bond_duration_target': 6.0,
         'bond_sleeve': {'BND': 0.50, 'IEF': 0.30, 'SPTL': 0.20},
-        'satellite_overrides': {},
     },
     'Recession/Deflation': {
         'bond_duration_target': 10.0,
         'bond_sleeve': {'SPTL': 0.40, 'IEF': 0.35, 'BND': 0.25},
-        'satellite_overrides': {'GLDM': 0.15},
     },
     'Risk-Off/Transition': {
         'bond_duration_target': 4.0,
         'bond_sleeve': {'SHY': 0.40, 'BND': 0.35, 'IEF': 0.25},
-        'satellite_overrides': {'GLDM': 0.20},
     },
 }
 
 # ============================================================
 # MONTHLY CONTRIBUTIONS (SGD → USD at 0.79)
 # ============================================================
+# satellite_sgd moved to config/settings_satellite.py
 MONTHLY_CONTRIB = {
     'core_sgd': 2000,
-    'satellite_sgd': 300,
     'fx_rate': 0.79,
 }
 
@@ -201,6 +165,8 @@ MONTHLY_CONTRIB = {
 # ============================================================
 OUTPUT_PATH = 'output/portfolio_tracker.xlsx'
 NAS_PATH = '/volume1/investments/portfolio_tracker.xlsx'
+SNAPSHOT_PATH = 'output/latest_snapshot.json'
+DASHBOARD_PATH = 'output/dashboard.html'
 
 # ============================================================
 # SNAPSHOT DATE
@@ -213,7 +179,6 @@ SNAPSHOT_DATE = '2026-07-24'
 # Bump 'value' (YYYY-MM-DD) every time you actually refresh the underlying data.
 # The audit module compares each entry to today and flags STALE if older than cadence_days.
 DATA_FRESHNESS = {
-    # key: {value: last-updated date, cadence_days: max acceptable age, label: display name, update_action: exact thing to do}
     'snapshot_date': {
         'value':         SNAPSHOT_DATE,
         'cadence_days':  14,
@@ -226,24 +191,6 @@ DATA_FRESHNESS = {
         'label':         'Macro regime block',
         'update_action': 'Update MACRO_REGIME dict + open_inflections in settings.py; bump value here',
     },
-    'pe_5y_averages': {
-        'value':         '2026-07-24',
-        'cadence_days':  90,
-        'label':         '5Y P/E averages (quarterly)',
-        'update_action': 'Refresh PE_5Y_AVERAGES from Macrotrends/YF; bump value here',
-    },
-    'satellite_targets': {
-        'value':         '2026-04-17',
-        'cadence_days':  30,
-        'label':         'Satellite tier weights',
-        'update_action': 'Review SATELLITE_TARGETS for post-trade changes; bump value here',
-    },
-    'watchlist': {
-        'value':         '2026-07-24',
-        'cadence_days':  14,
-        'label':         'Watchlist pending actions',
-        'update_action': 'Resolve or extend each WATCHLIST entry; bump value here',
-    },
     'offline_prices': {
         'value':         SNAPSHOT_DATE,
         'cadence_days':  14,
@@ -253,148 +200,13 @@ DATA_FRESHNESS = {
 }
 
 # ============================================================
-# WATCHLIST
+# WATCHLIST — empty. Core/Core-Plus is passive index exposure; there are no
+# active entry/exit theses to track here. All watchlist items moved to
+# config/settings_satellite.py.
 # ============================================================
-WATCHLIST = {
-    'BABA_EXIT': {
-        'ticker': 'BABA',
-        'action': 'EXIT',
-        'note': (
-            'STOP-LOSS TRIGGERED 2026-04-18: -15.8% loss ($138.59 vs $164.69 cost). '
-            'Override log (2026-03-31): "No further overrides on BABA. '
-            'Next breach of -15% from current price = execute exit, no exceptions." '
-            '2026-07-24 run: BABA not flagged in this cycle\'s Trim/Entry Signals — check current P&L% on Entry Signals sheet; '
-            'if still below -15% cost basis, override log says execute now, no exceptions. '
-            'Sell 1 share (~$138 proceeds). Redeploy into GLDM (underweight) or AON (score 1 entry). '
-            'After execution: remove BABA from TICKER_TIERS and SATELLITE_TARGETS.'
-        ),
-        'trigger_date': '2026-04-18',
-    },
-    'XLE_DEFERRED': {
-        'ticker': 'XLE',
-        'action': 'ENTRY CONDITION MET',
-        'note': (
-            'Original thesis: stagflation + oil >$100 = energy alpha. Oil dropped to $88 on Iran ceasefire (Apr 8), thesis weakened, deferred. '
-            'TRIGGER HIT 2026-07-24: Hormuz effectively closed (Jul 11-23, only 15 ships transited Jul 19 vs ~88/day normal) + new Houthi Red Sea front. '
-            'Brent breached $100 intraday Jul 23-24, first time in 2 months. Entry condition (oil >$95 post-ceasefire-collapse) satisfied. '
-            'Verify current XLE price/P/E via Screener sheet before sizing; XLE at 0.07 target with no position — resume normal ADD tranches.'
-        ),
-        'review_date': '2026-07-24',
-    },
-    'CAT_TRIM': {
-        'ticker': 'CAT',
-        'action': 'TRIM 50%',
-        'note': (
-            'P/E ~48x (Jul 2026) vs revised 5Y avg 20.0 (was 19.0) — still ~140% premium. Score 5 — both trim triggers firing, still active this cycle. '
-            'Override on 2026-03-31 was correct (+$80/share gain). '
-            'Recommend trimming 50% at current levels. Check Entry Signals sheet for live price/P/E. '
-            'Proceeds → AON or MA. Re-entry target: $580.'
-        ),
-    },
-    'CAT_REENTRY': {
-        'ticker': 'CAT',
-        'target_price': 580,
-        'note': 'Re-entry after trim — Infrastructure supercycle thesis intact',
-    },
-    'MSFT_WATCH': {
-        'ticker': 'MSFT',
-        'target_price': 380,
-        'note': (
-            'Catalyst date (2026-04-29 Q3 earnings) has passed — NOT YET RESOLVED, needs manual research this cycle. '
-            'Entry requires: Azure Q3 growth >= 38%, '
-            'CapEx guidance plateaus, stock holds above $380 post-earnings, '
-            'no adverse OpenAI lawsuit outcome. Target 5-7% satellite if met. '
-            'Also unresolved given current regime: MSFT scored regime-misfit (❌) for Quadrant D in WATCHLIST_REGIME_FIT — '
-            'confirm whether stagflation/hike-risk thesis still argues against entry regardless of earnings outcome.'
-        ),
-        'catalyst_date': '2026-04-29',
-        'entry_condition': 'Azure >= 38% AND stock > $380 post-earnings AND no lawsuit shock',
-    },
-    'LMT': {
-        'ticker': 'LMT',
-        'target_price': 480,
-        'note': 'Defense alternative to RTX',
-    },
-    'EUAD': {
-        'ticker': 'EUAD',
-        'target_price': None,
-        'note': 'European defense ETF — NATO rearmament',
-    },
-    'DBS': {
-        'ticker': 'D05.SI',   # Fixed 2026-07-24 — bare 'DBS' resolved to Invesco DB Silver Fund on Yahoo/yfinance, wrong instrument
-        'target_price': None,
-        'note': 'Singapore bank — SGD base, ASEAN growth. Price quoted in SGD (SGX-listed), not USD like the rest of the watchlist.',
-    },
-    'COPX': {
-        'ticker': 'COPX',
-        'target_price': None,
-        'note': 'Copper miners — critical minerals theme',
-    },
-    'MRVL': {
-        'ticker': 'MRVL',
-        'target_price': None,
-        'note': (
-            'Custom silicon / data center / AI infrastructure. Similar regime profile to NVDA — '
-            'not a Quadrant D fit (high multiple, growth, no FCF cushion). Hold on watchlist for '
-            'a regime shift toward B (Fed BS > $7T + cut prob > 30%) or for a major valuation reset.'
-        ),
-    },
-    # === Quadrant D regime-fit additions (added 2026-06-03) ===
-    'WPM': {
-        'ticker': 'WPM',
-        'target_price': None,
-        'note': (
-            'Wheaton Precious Metals — gold/silver streaming. Asset-light leverage to GLDM thesis '
-            'with real FCF (vs miners with capex risk). Quadrant D fit: real assets + pricing power. '
-            'Entry: confirm 5Y avg P/E vs current; size as Tier-1 satellite candidate if GLDM grows.'
-        ),
-    },
-    'MOS': {
-        'ticker': 'MOS',
-        'target_price': None,
-        'note': (
-            'Mosaic — phosphate/potash fertilizer. Complements NTR food-security thesis; pure-play '
-            'commodity exposure. Quadrant D fit: real asset, inflation-linked. '
-            'Entry: only if NTR thesis confirms and Mosaic trades at <12x forward earnings.'
-        ),
-    },
-    'LIN': {
-        'ticker': 'LIN',
-        'target_price': None,
-        'note': (
-            'Linde — industrial gases duopoly (with APD on QB list). Defensive compounder with '
-            'pricing power and contractual revenue. Quadrant D fit: pricing power + FCF moat. '
-            'Entry: research P/E vs 5Y avg first; rich quality names often start above fair value.'
-        ),
-    },
-    # Quadrant B rotation candidates — DO NOT enter yet. Monitor for Fed BS > $7T + cut prob > 30%.
-    'QB_ISRG':  {'ticker': 'ISRG',  'action': 'WATCH', 'note': 'Quadrant B candidate — surgical robotics growth'},
-    'QB_APD':   {'ticker': 'APD',   'action': 'WATCH', 'note': 'Quadrant B candidate — industrial gases / green hydrogen'},
-    'QB_FCX':   {'ticker': 'FCX',   'action': 'WATCH', 'note': 'Quadrant B candidate — copper / critical minerals'},
-    'QB_CCJ':   {'ticker': 'CCJ',   'action': 'WATCH', 'note': 'Quadrant B candidate — uranium / nuclear renaissance'},
-}
+WATCHLIST = {}
 
 # ============================================================
-# WATCHLIST REGIME FIT — Quadrant D scoring for screener
+# WATCHLIST REGIME FIT — empty for the same reason as WATCHLIST above.
 # ============================================================
-# score: ✅ = regime-fit (hard asset, defense, pricing power, short duration)
-#        ⚠️ = neutral (thesis intact but not regime-optimal)
-#        ❌ = regime-misfit (high multiple, no FCF, long duration, China-dependent)
-WATCHLIST_REGIME_FIT = {
-    'BABA': {'score': '❌', 'reason': 'China-dependent; deglobalization conflict'},
-    'XLE':  {'score': '✅', 'reason': 'Energy hedge; stagflation alpha'},
-    'CAT':  {'score': '⚠️', 'reason': 'Industrial compounder; P/E elevated at 41x vs 19x avg'},
-    'MSFT': {'score': '❌', 'reason': 'High multiple; long-duration growth proxy; QB fit not D'},
-    'LMT':  {'score': '✅', 'reason': 'Defense; NATO spending catalyst; FCF compounder'},
-    'EUAD': {'score': '✅', 'reason': 'European defense ETF; NATO rearmament theme'},
-    'D05.SI': {'score': '⚠️', 'reason': 'SGD base + ASEAN growth; rate-sensitive NIM compression risk'},
-    'COPX': {'score': '⚠️', 'reason': 'Copper miners; real assets but cyclical in stagflation'},
-    'MRVL': {'score': '❌', 'reason': 'High multiple; no FCF cushion; hold for QB or valuation reset'},
-    'WPM':  {'score': '✅', 'reason': 'Gold/silver streaming; real assets + FCF (no capex risk)'},
-    'MOS':  {'score': '✅', 'reason': 'Fertilizer/potash; food security; inflation-linked commodity'},
-    'LIN':  {'score': '✅', 'reason': 'Pricing power + contractual FCF; industrial gases duopoly'},
-    'ISRG': {'score': '❌', 'reason': 'High multiple; growth; no FCF cushion; QB candidate not D'},
-    'APD':  {'score': '⚠️', 'reason': 'QB candidate; industrial gases; neutral in D pending BS trigger'},
-    'FCX':  {'score': '⚠️', 'reason': 'Copper/critical minerals; real assets but cyclical in stagflation'},
-    'CCJ':  {'score': '⚠️', 'reason': 'Uranium/nuclear; QB candidate; real-asset case in D is weak'},
-}
+WATCHLIST_REGIME_FIT = {}

@@ -43,6 +43,17 @@ def classify_tiers(positions_df, settings):
 
     tier_counts = df.groupby('tier').size().to_dict()
     logger.info(f"Tier classification: {tier_counts}")
+
+    # Drop positions this tracker doesn't know about. Two trackers can point at
+    # the same brokerage account and each own a disjoint slice of TICKER_TIERS
+    # (e.g. a Core/Core-Plus tracker + a separate Satellite/risk tracker) — an
+    # unclassified position must not inflate this tracker's total_value and
+    # dilute its tier-weight math with the other tracker's holdings.
+    unknown = df[df['tier'] == 'Unknown']
+    if not unknown.empty:
+        logger.info(f"Excluding {len(unknown)} unclassified position(s) from totals: {unknown['symbol'].tolist()}")
+    df = df[df['tier'] != 'Unknown'].copy()
+
     return df
 
 

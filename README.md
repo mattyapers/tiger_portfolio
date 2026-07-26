@@ -1,9 +1,11 @@
 # Tiger Portfolio Tracker
 
-A rules-based portfolio management pipeline for a Singapore-based investor running a Core (68%) / Core-Plus (11%) / Satellite (21%) allocation with a 30-year, 8% CAGR target. Generates both an interactive Excel report and a self-contained HTML dashboard.
+A rules-based portfolio management pipeline for a Singapore-based investor, covering **two books from one repo**: a Core (86%) / Core-Plus (14%) long-term passive buy-and-hold book, and a Satellite/active-thesis risk book. Generates both an interactive Excel report and a self-contained HTML dashboard for each.
+
+> **Split 2026-07-24:** This project used to run one blended Core (68%) / Core-Plus (11%) / Satellite (21%) allocation. It's now two logical books sharing one codebase: `python main.py` runs Core/Core-Plus (`config/settings.py`), `python main.py --satellite` runs the Satellite/risk book (`config/settings_satellite.py`). Same Tiger Brokers account, same `modules/` code — each book only totals its own slice of `TICKER_TIERS`, so the two never blend into one pie or double-count each other's positions. See [Two Books, One Repo](#two-books-one-repo) below. Core/Core-Plus targets above are the original 68/11 ratio rescaled to sum to 100% now that Satellite has its own book.
 
 **Author:** Matthew  
-**Last Updated:** 2026-07-24 (Watchlist + Screener verified)  
+**Last Updated:** 2026-07-24 (Core/Core-Plus + Satellite split into two books, one repo)  
 **Python:** 3.12+ on Windows  
 
 ---
@@ -14,17 +16,20 @@ A rules-based portfolio management pipeline for a Singapore-based investor runni
 # Install dependencies
 pip install tigeropen yfinance pandas openpyxl numpy
 
-# Default: live Tiger positions + live yfinance prices (recommended)
+# Core/Core-Plus book (default): live Tiger positions + live yfinance prices
 python main.py
 
-# Test without Tiger credentials (offline shares, live prices)
+# Satellite/risk book instead — same account, different config
+python main.py --satellite
+
+# Test without Tiger credentials (offline shares, live prices) — combine with --satellite too
 python main.py --yf-only
 
 # Fully offline (no internet — uses latest auto-saved snapshot)
 python main.py --offline
 ```
 
-Output: `output/portfolio_tracker.xlsx` and `output/dashboard.html`
+Output: `output/portfolio_tracker.xlsx` + `output/dashboard.html` (Core/Core-Plus), or `output/satellite_tracker.xlsx` + `output/satellite_dashboard.html` (`--satellite`) — see [Two Books, One Repo](#two-books-one-repo).
 
 ---
 
@@ -57,7 +62,7 @@ main.py (orchestrator)
                              └─ generate self-contained HTML dashboard
 ```
 
-**Data flow:** Every file passes data forward as DataFrames or dicts. `settings.py` is imported by all three stages — it's the single source of truth for rules, thresholds, and targets.
+**Data flow:** Every file passes data forward as DataFrames or dicts. `settings.py` (or `settings_satellite.py` under `--satellite`) is imported once by `main.py` and passed as a parameter into every stage — it's the single source of truth for rules, thresholds, and targets, and no other module imports it directly.
 
 ---
 
@@ -65,30 +70,49 @@ main.py (orchestrator)
 
 ```
 tiger_portfolio/
-├── main.py                  ← Run this. Orchestrates extract → transform → load.
+├── main.py                  ← Run this. --satellite picks the other book. Orchestrates extract → transform → load.
 ├── config/
-│   ├── settings.py          ← All rules, targets, thresholds, API credentials.
-│   ├── tiger_private_key.pem← RSA key for Tiger API auth (NEVER commit to git).
+│   ├── settings.py            ← Core/Core-Plus book: rules, targets, thresholds, API credentials.
+│   ├── settings_satellite.py  ← Satellite/risk book: same shape, different tickers/targets/output paths.
+│   ├── tiger_private_key.pem  ← RSA key for Tiger API auth (NEVER commit to git). Same key, both books.
 │   └── __init__.py
-├── modules/
+├── modules/                  ← Shared by both books — no ticker names hardcoded here, all driven by settings.
 │   ├── extract.py           ← Stage 1: Pull data from Tiger + yfinance.
-│   ├── transform.py         ← Stage 2: Calculate metrics, generate signals.
+│   ├── transform.py         ← Stage 2: Calculate metrics, generate signals. classify_tiers() drops anything not in the active book's TICKER_TIERS.
 │   ├── screener.py          ← Stage 2b: Fetch + score WATCHLIST tickers (skipped offline).
 │   ├── load.py              ← Stage 3: Write Excel workbook.
 │   ├── dashboard.py         ← Stage 4: Generate HTML portfolio dashboard.
 │   ├── audit.py             ← Data freshness + price-drift checks (written to Audit sheet).
 │   └── __init__.py
 ├── output/
-│   ├── portfolio_tracker.xlsx  ← Generated Excel report (7 sheets).
-│   ├── dashboard.html          ← Generated HTML dashboard (4 sections).
-│   ├── latest_snapshot.json    ← Auto-saved after every hybrid/yf-only run.
-│   └── run_YYYYMMDD_HHMM.log  ← Log file per run.
+│   ├── portfolio_tracker.xlsx    ← Core/Core-Plus Excel report (7 sheets).
+│   ├── satellite_tracker.xlsx    ← Satellite Excel report (`--satellite`), separate file.
+│   ├── dashboard.html            ← Core/Core-Plus HTML dashboard.
+│   ├── satellite_dashboard.html  ← Satellite HTML dashboard (`--satellite`).
+│   ├── latest_snapshot.json      ← Core/Core-Plus auto-saved snapshot.
+│   ├── satellite_snapshot.json   ← Satellite auto-saved snapshot (`--satellite`).
+│   └── run_{core|satellite}_YYYYMMDD_HHMM.log  ← Log file per run, tagged by book.
 ├── prompts/
 │   ├── stage0_freshness_check.md  ← Paste into Claude: staleness triage (no web search).
 │   ├── stage1_macro_regime.md     ← Paste into Claude: fetch macro data + generate MACRO_REGIME dict.
 │   └── stage2_weekly_review.md    ← Paste into Claude: full weekly portfolio review (attach xlsx).
 └── README.md                ← You are here.
 ```
+
+---
+
+## Two Books, One Repo
+
+**Why:** Core/Core-Plus is long-term, passive, buy-and-hold. Satellite is active and thesis-driven. Blending them into one 68/11/21 allocation meant Satellite's per-position P/E scores and trim triggers cluttered the passive book's dashboard, and sizing was hard to reason about ("Satellite is 21% of everything, GLDM is 15% of Satellite" — what's GLDM really, as a fraction of net worth?). Splitting into two books means the numbers you see ARE the real sizing: GLDM at 15% in the Satellite book means 15% of that book, full stop.
+
+**How it works, mechanically:**
+- Same Tiger Brokers account, same `.env`/`config/tiger_private_key.pem`, same `modules/` code
+- `main.py` picks `config/settings.py` by default, or `config/settings_satellite.py` when you pass `--satellite`
+- Each settings module has a disjoint `TICKER_TIERS` — Core/Core-Plus/Core-Bond tickers in one, Satellite tickers in the other
+- `modules/transform.py`'s `classify_tiers()` drops any position not in the active book's `TICKER_TIERS` (tier `Unknown`) before computing totals — this is what stops the two books' positions from bleeding into each other's weight/drift math when they share one account
+- Separate `OUTPUT_PATH` / `SNAPSHOT_PATH` / `DASHBOARD_PATH` per book (set in each settings module) so running both never overwrites the other's files
+
+**Known gap:** 1 share of `MRVL` (cost $300.34) is held in the account but isn't in either book's `TICKER_TIERS` — invisible to both books' totals until added to one of them (or tracked manually). See the `MRVL` note in `WATCHLIST` in `config/settings_satellite.py`.
 
 ---
 
@@ -100,13 +124,13 @@ tiger_portfolio/
 |-------|--------|---------|
 | 📊 Dashboard | transform + settings | Tier weights, P&L summary, macro regime, next review date |
 | 📈 Holdings | extract + transform | All positions — price (blue/editable), shares, P&L, weight vs target |
-| ⚖️ Rebalance Signals | transform | Satellite drift signals: TRIM/ADD/HOLD, shares to trade, est. proceeds |
-| 🎯 Entry Signals | transform | P/E scoring (1–5), stop-loss flags, entry/exit signals per position |
+| ⚖️ Rebalance Signals | transform | Satellite drift signals: TRIM/ADD/HOLD, shares to trade, est. proceeds — **renders empty in the Core/Core-Plus book**; populated when run with `--satellite` |
+| 🎯 Entry Signals | transform | P/E scoring (1–5), stop-loss flags, entry/exit signals per position — **renders empty here**, same reason |
 | 📋 Audit | audit | Data freshness table + price drift vs snapshot (>10% flagged) |
-| 👀 Watchlist | settings.WATCHLIST | All pending actions — action, target price, date, note; EXIT/TRIM highlighted red |
-| 🔍 Screener | screener + yfinance | WATCHLIST tickers: P/E TTM, Fwd P/E, 5Y avg, premium, FCF yield, Quadrant D regime fit |
+| 👀 Watchlist | settings.WATCHLIST | All pending actions — **renders empty in the Core/Core-Plus book** (`WATCHLIST = {}` in `config/settings.py`); active theses live in `config/settings_satellite.py`, populated when run with `--satellite` |
+| 🔍 Screener | screener + yfinance | WATCHLIST tickers: P/E TTM, Fwd P/E, 5Y avg, premium, FCF yield, Quadrant D regime fit — **renders empty here**, same reason as Watchlist |
 
-The **Screener** sheet is populated in hybrid and yf-only modes. In `--offline` mode it renders empty with a notice. Tickers without a `PE_5Y_AVERAGES` entry show `—` for premium — the row still renders. Tickers that fail yfinance fetch show `ERR` in the Signal column. Verified with 16 watchlist tickers.
+The **Screener** sheet is populated in hybrid and yf-only modes when `WATCHLIST` has entries. In `--offline` mode, or here (empty `WATCHLIST`), it renders empty with a notice. Tickers without a `PE_5Y_AVERAGES` entry show `—` for premium — the row still renders. Tickers that fail yfinance fetch show `ERR` in the Signal column.
 
 ---
 
@@ -153,39 +177,25 @@ Simply open `output/dashboard.html` in any web browser after running the pipelin
 
 | Tier | Target | Purpose | Tickers |
 |------|--------|---------|---------|
-| Core | 68% | Passive index tracking | VOO, VXUS |
-| Core-Bond | (part of Core) | Duration-managed bonds | SHY, VTIP, BND |
-| Core-Plus | 11% | Income + growth ETFs | SPYD, ONEQ |
-| Satellite | 21% | Active stock picks | RTX, GLDM, GOOG, NVDA, etc. |
+| Core | 86% | Passive index tracking | VOO, VXUS |
+| Core-Bond | (part of Core) | Duration-managed bonds | SHY, VTIP, BND, IEF, SPTL |
+| Core-Plus | 14% | Income + growth ETFs | SPYD, ONEQ |
 
-### Satellite Targets
-
-High-conviction positions get higher targets. The effective cap for breach detection is `max(target, 10%)` — so RTX at 18% target won't false-trigger the 10% hard cap.
+Satellite (active stock picks — RTX, GLDM, GOOG, NVDA, etc.) lives in `config/settings_satellite.py`, run via `python main.py --satellite`. Entry/exit scoring, per-position P/E signals, and `SATELLITE_TARGETS` are all defined there.
 
 ### Rebalance Rules (settings.py)
 
-- **3% drift threshold:** Position drifts >3% from target → signal generated (`REBALANCE_RULES['drift_threshold']`)
-- **15% hard cap:** No single position >15% of satellite — raised from 10% to accommodate Tier-1 positions (GLDM, RTX, GOOG) (`REBALANCE_RULES['max_position_pct']`)
+- **Tier drift:** Core/Core-Plus vs. `TIER_TARGETS` — >5pp drift triggers 🚨 Rebalance, >3pp triggers ⚠️ Drifting (hardcoded in `transform.py`'s `calculate_tier_drift()`, not a `settings.py` value)
 - **14-day review cycle:** Run the pipeline every 2 weeks minimum (`REBALANCE_RULES['review_cycle_days']`)
-- **-15% stop-loss:** P&L below -15% from cost → exit signal (`SIGNAL_RULES['stop_loss_pct']`)
-
-### Entry/Exit Scoring (1-5, lower = better)
-
-| Score | Condition | Signal |
-|-------|-----------|--------|
-| 5 | P/E >30 AND >25% above 5Y avg | TRIM |
-| 4 | P/E >30 OR >25% above 5Y avg | WATCH |
-| 3 | Slightly above 5Y avg | HOLD |
-| 2 | Near 5Y avg | HOLD |
-| 1 | Below 5Y avg | ENTRY (good value) |
+- `REBALANCE_RULES`/`SIGNAL_RULES` in `settings.py` are otherwise dormant in the Core/Core-Plus book — they only drive per-position Satellite signals, which live in `settings_satellite.py`'s copy of these dicts. Kept (not deleted) here because `load.py`/`transform.py` reference them unconditionally regardless of which book is active.
 
 ### Macro Regime (manual input)
 
-The `MACRO_REGIME` dict in settings.py drives the dashboard. Update it at each 14-day review. The `REGIME_PLAYBOOK` maps each regime to bond duration targets and satellite overrides.
+The `MACRO_REGIME` dict in settings.py drives the dashboard and the `REGIME_PLAYBOOK`'s Core-Bond duration target. Update it at each 14-day review. (`settings_satellite.py` keeps its own copy of `MACRO_REGIME` — same content, updated at the same time — plus its own `REGIME_PLAYBOOK` with `satellite_overrides` instead of bond fields.)
 
-**Current regime (2026-07-08):** Stagflation-Lite / Hike-Risk, Geopolitical Escalation Re-Igniting | Quadrant D. Hormuz ceasefire (Islamabad MOU, Jun 17) declared "over" by Trump Jul 8 after mutual strikes. PCE 4.07% (May), CPI 4.2% (May), Brent $77.92 (+5.06%) on Hormuz tanker attacks. Defensive positioning maintained (SHY, VTIP, GLDM, RTX).
+**Current regime (2026-07-24):** Stagflation / Hike-Risk Escalating — Hormuz Effectively Closed, Oil Shock Underway | Quadrant D, high confidence. Hormuz effectively closed Jul 11-23 (only 15 ships transited Jul 19 vs ~88/day normal). Brent broke $100 intraday for the first time in 2 months. Fed hike risk resurfaced to ~35% for the Jul 29 FOMC (from near-zero). See `config/settings.py`'s `MACRO_REGIME` dict for full detail.
 
-**Quadrant B watch:** Two conditions required to rotate — (1) Fed balance sheet > $7T (currently $6.736T, $264B away), (2) rate cut prob > 30% (currently ~15%). Rotation candidates: ISRG, APD, FCX, CCJ. Do not enter yet.
+**Quadrant B watch:** Two conditions required to rotate — (1) Fed balance sheet > $7T (currently $6.736T, $264B away), (2) Dec cut prob > 30% (currently ~15.4%). Still far.
 
 ---
 
@@ -210,15 +220,18 @@ The `MACRO_REGIME` dict in settings.py drives the dashboard. Update it at each 1
 
 ### Adding a new ticker
 
-1. Add to `TICKER_TIERS` in settings.py (assign tier)
-2. If satellite: add to `SATELLITE_TARGETS` with weight (0.07 default)
-3. If satellite: add `PE_5Y_AVERAGES` entry
-4. Add display name to `name_map` dict in load.py
-5. Run pipeline to verify
+For Core/Core-Plus/Core-Bond, edit `config/settings.py`. For a new active/thesis-driven satellite position, edit `config/settings_satellite.py` instead — same steps, different file.
+
+1. Add to `TICKER_TIERS` (Core book: `Core` / `Core-Bond` / `Core-Plus`; Satellite book: `Satellite`)
+2. Satellite book only: add to `SATELLITE_TARGETS` (rebalance the others so it still sums to 1.00) and `PE_5Y_AVERAGES`
+3. Add display name to `name_map` dict in load.py
+4. Run pipeline to verify (`python main.py` or `python main.py --satellite`)
 
 ### Adding a ticker to the Watchlist
 
-1. Add entry to `WATCHLIST` in settings.py (fields: `ticker`, `action`, `note`, optional `target_price` / `trigger_date`)
+The Core/Core-Plus book's `WATCHLIST` is intentionally empty — passive index exposure has no active entry/exit theses to track. Add new watchlist candidates to `config/settings_satellite.py` instead:
+
+1. Add entry to `WATCHLIST` in settings_satellite.py (fields: `ticker`, `action`, `note`, optional `target_price` / `trigger_date`)
 2. Add a `WATCHLIST_REGIME_FIT` entry: `{'score': '✅|⚠️|❌', 'reason': '...'}`
 3. If a 5Y P/E average is available: add to `PE_5Y_AVERAGES` (optional — omitting shows `—` for premium, row still renders)
 4. Run pipeline — ticker appears in Watchlist and Screener sheets automatically
@@ -319,17 +332,9 @@ Operational checklists and execution plans live in Notion under the Investing wo
 
 ---
 
-## Pending Actions (as of 2026-07-08)
+## Pending Actions
 
-See `WATCHLIST` in `config/settings.py` for the authoritative list. Key open items:
-
-| Priority | Ticker | Action | Condition |
-|----------|--------|--------|-----------|
-| OPEN | BABA | Exit (stop-loss -15.8%) | Stop-loss triggered — sell and redeploy to GLDM or AON. |
-| OPEN | XLE | Deferred entry | Thesis weakened at oil <$85; revisit if oil >$95. |
-| OPEN | CAT | Trim 50% | P/E 41x (116% above 5Y avg). Proceeds → AON or MA. Re-entry at $580. |
-| WATCH | MSFT | Entry trigger | Post-Apr 29 earnings: Azure ≥38% + stock >$380 + no lawsuit shock. |
-| WATCH | Quadrant B | Pre-research ISRG, APD, FCX, CCJ | Trigger: Fed BS >$7T AND cut prob >30%. |
+None in the Core/Core-Plus book — `WATCHLIST` here is intentionally empty (passive only). All open items (BABA exit, XLE entry, CAT trim, MSFT watch, Quadrant B candidates) live in `config/settings_satellite.py`'s `WATCHLIST` — run `python main.py --satellite` and check that book's Watchlist sheet.
 
 ## Future Roadmap
 

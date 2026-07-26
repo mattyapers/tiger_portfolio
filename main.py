@@ -2,10 +2,18 @@
 main.py — Orchestrator: Extract → Transform → Load
 
 USAGE:
-  python main.py              → Hybrid mode (Tiger + yfinance) [DEFAULT]
-  python main.py --hybrid     → Same as above, explicit
-  python main.py --yf-only    → Offline shares + yfinance prices (no Tiger needed)
-  python main.py --offline    → Manual snapshot data, no API calls
+  python main.py                  → Core/Core-Plus book, hybrid mode [DEFAULT]
+  python main.py --satellite      → Satellite/risk book instead (config/settings_satellite.py)
+  python main.py --yf-only        → Offline shares + yfinance prices (no Tiger needed)
+  python main.py --offline        → Manual snapshot data, no API calls
+  (flags combine, e.g. python main.py --satellite --offline)
+
+Both books share every module in modules/ — they only differ in which
+config/settings*.py module gets loaded, which determines TICKER_TIERS,
+OUTPUT_PATH, SNAPSHOT_PATH, DASHBOARD_PATH, WATCHLIST, etc. Each book's
+classify_tiers() (modules/transform.py) drops any position not in its own
+TICKER_TIERS before totals are computed, so running both against the same
+Tiger account never double-counts a position between them.
 
 PIPELINE:
   1. EXTRACT: Pull positions (Tiger) + prices (yfinance)
@@ -35,11 +43,14 @@ for folder in ['output', 'config', 'modules']:
     if not os.path.exists(init_file):
         open(init_file, 'w').close()
 
+_args = sys.argv[1:]
+PORTFOLIO = 'satellite' if '--satellite' in _args else 'core'
+
 console_handler = logging.StreamHandler(
     stream=io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 )
 file_handler = logging.FileHandler(
-    f'output/run_{datetime.now():%Y%m%d_%H%M}.log', encoding='utf-8'
+    f'output/run_{PORTFOLIO}_{datetime.now():%Y%m%d_%H%M}.log', encoding='utf-8'
 )
 logging.basicConfig(
     level=logging.INFO,
@@ -48,7 +59,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger('PortfolioPipeline')
 
-from config import settings
+if PORTFOLIO == 'satellite':
+    from config import settings_satellite as settings
+else:
+    from config import settings
 from modules.extract import extract_hybrid, extract_yf_only, extract_offline
 from modules.transform import transform_all
 from modules.load import load_to_excel
@@ -59,7 +73,7 @@ from modules.dashboard import generate_html_dashboard
 
 def run_pipeline(mode='hybrid'):
     logger.info("=" * 60)
-    logger.info(f"PORTFOLIO PIPELINE — Mode: {mode.upper()}")
+    logger.info(f"PORTFOLIO PIPELINE — Book: {PORTFOLIO.upper()} | Mode: {mode.upper()}")
     logger.info("=" * 60)
 
     # STAGE 0: AUDIT — freshness checks before we trust anything downstream
@@ -93,8 +107,11 @@ def run_pipeline(mode='hybrid'):
 
     summary = analytics['summary']
     logger.info(f"  Total portfolio: ${summary['total_portfolio']:,.2f}")
-    logger.info(f"  Core: {summary['core_pct']:.1%} | Target: 68%")
-    logger.info(f"  Satellite: {summary['satellite_pct']:.1%} | Target: 21%")
+    for tier, target in settings.TIER_TARGETS.items():
+        key_map = {'Core': 'core_pct', 'Core-Plus': 'coreplus_pct', 'Satellite': 'satellite_pct'}
+        pct_key = key_map.get(tier)
+        if pct_key and pct_key in summary:
+            logger.info(f"  {tier}: {summary[pct_key]:.1%} | Target: {target:.0%}")
     logger.info(f"  Total P&L: ${summary['total_pnl']:,.2f} ({summary['total_pnl_pct']:.1%})")
 
     rebal = analytics['rebalance']
@@ -131,8 +148,8 @@ def run_pipeline(mode='hybrid'):
     logger.info("STAGE 3b: Generating HTML dashboard...")
     try:
         dashboard_path = generate_html_dashboard(
-            snapshot_path="output/latest_snapshot.json",
-            output_path="output/dashboard.html"
+            snapshot_path=getattr(settings, 'SNAPSHOT_PATH', 'output/latest_snapshot.json'),
+            output_path=getattr(settings, 'DASHBOARD_PATH', 'output/dashboard.html')
         )
         logger.info(f"  Dashboard: {dashboard_path}")
     except Exception as e:
