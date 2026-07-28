@@ -12,13 +12,6 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 
-# For macro data (FRED API) - use fredapi if installed, else fallback to demo data
-try:
-    from fredapi import Fred
-    FRED_AVAILABLE = True
-except ImportError:
-    FRED_AVAILABLE = False
-
 
 def load_snapshot(snapshot_path="output/latest_snapshot.json"):
     """Load portfolio snapshot from JSON."""
@@ -86,62 +79,57 @@ def fetch_technical_data(symbols, lookback_days=365):
     return technical_data
 
 
-def fetch_macro_data():
+def _macro_split(text):
     """
-    Fetch macro indicators. Returns dict with key macro metrics.
-    Falls back to demonstration data if FRED API unavailable.
+    Split a MACRO_REGIME string into a short headline + fuller detail.
+
+    MACRO_REGIME values are hand-written prose (e.g. '3.50-3.75% (held since
+    Dec 2025 cut); Jul 29 FOMC decision tomorrow') rather than clean numbers —
+    split on the first ';' or ',' so the card shows a short value with the
+    rest as a sub-line, same visual pattern the old numeric cards used.
     """
-    macro = {}
-    
-    if FRED_AVAILABLE:
-        try:
-            # Requires FRED API key in environment variable
-            fred_key = os.getenv("FRED_API_KEY")
-            if fred_key:
-                fred = Fred(api_key=fred_key)
-                macro = {
-                    "cpi": round(fred.get_series("CPIAUCSL").iloc[-1], 2),
-                    "pce": round(fred.get_series("PCEPI").iloc[-1], 2),
-                    "unemployment": round(fred.get_series("UNRATE").iloc[-1], 2),
-                    "fed_funds": round(fred.get_series("FEDFUNDS").iloc[-1], 3),
-                    "real_gdp_growth": round(fred.get_series("A191RL1Q225SBEA").iloc[-1], 2),
-                }
-        except Exception as e:
-            print(f"FRED API error: {e}")
-    
-    # Fetch Treasury yields from yfinance
-    try:
-        yields = yf.Tickers("^TNX ^FVX").tickers
-        tnx = yf.Ticker("^TNX").info.get("currentPrice", 4.2)
-        fvx = yf.Ticker("^FVX").info.get("currentPrice", 3.9)
-        
-        macro["yield_10y"] = round(tnx, 2)
-        macro["yield_2y"] = round(fvx, 2)
-        macro["yield_curve"] = round(tnx - fvx, 2)
-    except Exception as e:
-        print(f"Treasury yields error: {e}")
-        macro["yield_10y"] = 4.2
-        macro["yield_2y"] = 3.9
-        macro["yield_curve"] = 0.3
-    
-    # Fallback demo data if incomplete
-    defaults = {
-        "cpi": 315.5,
-        "pce": 308.2,
-        "unemployment": 4.1,
-        "fed_funds": 5.25,
-        "real_gdp_growth": 2.1,
-        "yield_10y": 4.2,
-        "yield_2y": 3.9,
-        "yield_curve": 0.3,
-        "dxy": 103.2,
-    }
-    
-    for key in defaults:
-        if key not in macro:
-            macro[key] = defaults[key]
-    
-    return macro
+    text = str(text)
+    for delim in [';', ',']:
+        if delim in text:
+            head, rest = text.split(delim, 1)
+            return head.strip(), rest.strip()
+    return text.strip(), ""
+
+
+def build_macro_cards(settings):
+    """
+    Build Macro Monitor card data straight from settings.MACRO_REGIME —
+    the same dict the Excel Dashboard sheet and the Stage 0/1/2 review
+    cycle (see prompts/) maintain. This used to be a separate FRED/yfinance
+    fetch that silently fell back to hardcoded demo numbers (Fed Funds
+    5.25%, etc.) whenever FRED_API_KEY wasn't set — which it never was —
+    so the Macro Monitor contradicted the actual tracked regime. Reading
+    MACRO_REGIME directly means there's only one source of truth for
+    macro data across Excel, this dashboard, and the review prompts.
+    """
+    regime = getattr(settings, 'MACRO_REGIME', {})
+
+    items = [("Quadrant", f"{regime.get('quadrant', 'N/A')} ({regime.get('confidence', '?')} confidence)",
+              regime.get('regime_label', ''))]
+
+    for key, label in [
+        ('fed_funds_rate', 'Fed Funds Rate'),
+        ('fed_balance_sheet', 'Fed Balance Sheet'),
+        ('pce_headline', 'PCE (Headline)'),
+        ('pce_core', 'PCE (Core)'),
+        ('cpi_latest', 'CPI'),
+        ('yield_curve', 'Yield Curve'),
+        ('vix', 'VIX'),
+        ('brent', 'Brent Crude'),
+        ('fedwatch_next_meeting', 'FedWatch (Next Meeting)'),
+        ('hormuz_status', 'Hormuz Status'),
+        ('tariff_section_122', 'Tariff Sec 122'),
+        ('mas_stance', 'MAS Stance'),
+    ]:
+        head, detail = _macro_split(regime.get(key, 'N/A'))
+        items.append((label, head, detail))
+
+    return items, regime.get('as_of_date', 'N/A')
 
 
 def calculate_valuation_metrics(snapshot, settings):
@@ -233,25 +221,29 @@ def calculate_allocation_chart(holdings, settings):
     is_satellite_book = 'Satellite' in settings.TIER_TARGETS
 
     if is_satellite_book:
-        sector_totals = {}
+        sector_groups = {}
         for h in holdings:
             mv = h["shares"] * h["latest_price"]
             try:
                 sector = yf.Ticker(h["symbol"]).info.get("sector") or "Unknown"
             except Exception:
                 sector = "Unknown"
-            sector_totals[sector] = sector_totals.get(sector, 0) + mv
-        ranked = sorted(sector_totals.items(), key=lambda kv: -kv[1])
+            g = sector_groups.setdefault(sector, {"value": 0.0, "members": []})
+            g["value"] += mv
+            g["members"].append(h["symbol"])
+        ranked = sorted(sector_groups.items(), key=lambda kv: -kv[1]["value"])
         labels = [k for k, _ in ranked]
-        values = [round(v / total * 100, 1) if total > 0 else 0 for _, v in ranked]
+        values = [round(v["value"] / total * 100, 1) if total > 0 else 0 for _, v in ranked]
+        members = [v["members"] for _, v in ranked]
         chart_title = "Allocation by Sector"
     else:
         ranked = sorted(holdings, key=lambda h: -(h["shares"] * h["latest_price"]))
         labels = [h["symbol"] for h in ranked]
         values = [round((h["shares"] * h["latest_price"]) / total * 100, 1) if total > 0 else 0 for h in ranked]
+        members = [[] for _ in ranked]
         chart_title = "Allocation by Holding"
 
-    return labels, values, chart_title
+    return labels, values, chart_title, members
 
 
 def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json", output_path="output/dashboard.html"):
@@ -266,8 +258,24 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     holdings = [h for h in snapshot.get("holdings", []) if h["symbol"] in tier_map]
     symbols = [h["symbol"] for h in holdings]
     technical = fetch_technical_data(symbols)
-    macro = fetch_macro_data()
-    chart_labels, chart_values, chart_title = calculate_allocation_chart(holdings, settings)
+    macro_items, macro_as_of = build_macro_cards(settings)
+    chart_labels, chart_values, chart_title, chart_members = calculate_allocation_chart(holdings, settings)
+
+    # Only render a tier card for tiers this book actually has (e.g. Satellite
+    # book has no Core/Core-Plus tier — showing a $0 card for it is noise).
+    tier_card_defs = [
+        ('Core', 'core_pct', 'core_value'),
+        ('Core-Plus', 'coreplus_pct', 'coreplus_value'),
+        ('Satellite', 'satellite_pct', 'satellite_value'),
+    ]
+    tier_cards_html = ''.join(
+        f'''<div class="metric-card">
+                            <div class="metric-label">{label} ({portfolio[pct_key]:.0f}%)</div>
+                            <div class="metric-value">${portfolio[val_key]:,.0f}</div>
+                        </div>
+                        '''
+        for label, pct_key, val_key in tier_card_defs if label in settings.TIER_TARGETS
+    )
     
     # Generate HTML
     html = f"""<!DOCTYPE html>
@@ -340,6 +348,46 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
             text-transform: uppercase;
             margin-bottom: 5px;
         }}
+        .info-tip {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #1f77b4;
+            color: #fff;
+            font-size: 10px;
+            font-weight: bold;
+            font-style: normal;
+            text-transform: none;
+            cursor: help;
+            margin-left: 5px;
+            position: relative;
+            vertical-align: middle;
+        }}
+        .info-tip::after {{
+            content: attr(data-tip);
+            display: none;
+            position: absolute;
+            bottom: 130%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: normal;
+            white-space: normal;
+            width: 260px;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            line-height: 1.4;
+        }}
+        .info-tip:hover::after {{
+            display: block;
+        }}
         .metric-value {{
             font-size: 20px;
             font-weight: 600;
@@ -401,26 +449,28 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
         }}
         .macro-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
             gap: 15px;
         }}
         .macro-card {{
             background: #f9f9f9;
             padding: 15px;
             border-radius: 6px;
-            text-align: center;
+            text-align: left;
             border: 1px solid #e0e0e0;
         }}
         .macro-card .label {{
             font-size: 11px;
-            color: #999;
+            color: #666;
+            font-weight: 600;
             text-transform: uppercase;
             margin-bottom: 8px;
         }}
         .macro-card .value {{
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 600;
             color: #333;
+            line-height: 1.3;
         }}
         .technical-grid {{
             display: grid;
@@ -520,7 +570,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     <div class="metric-value">${portfolio['total_equity']:,.0f}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Cash Balance</div>
+                    <div class="metric-label">Account Cash (shared)<span class="info-tip" data-tip="This is the whole Tiger account's cash balance, not attributable to this book specifically. Both Core/Core-Plus and Satellite share one brokerage account and one cash pool -- there is no per-book cash split, so this figure is identical on both dashboards.">i</span></div>
                     <div class="metric-value">${portfolio['cash']:,.0f}</div>
                 </div>
                 <div class="metric-card">
@@ -528,7 +578,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     <div class="metric-value {'positive' if portfolio['total_pnl'] >= 0 else 'negative'}">${portfolio['total_pnl']:,.0f}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Return %</div>
+                    <div class="metric-label">Return %<span class="info-tip" data-tip="Unrealized P&amp;L / Total Cost Basis x 100. Cost Basis = sum(shares x avg_cost) across this book's holdings only. This is a simple aggregate return on cost, NOT time-weighted (TWR) or money-weighted (XIRR/IRR) -- it doesn't account for when each tranche was bought. Excludes dividends received and any realized gains/losses from closed positions.">i</span></div>
                     <div class="metric-value {'positive' if portfolio['total_pnl_pct'] >= 0 else 'negative'}">{portfolio['total_pnl_pct']:.2f}%</div>
                 </div>
                 <div class="metric-card">
@@ -546,18 +596,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                 </div>
                 <div>
                     <div class="metrics-grid">
-                        <div class="metric-card">
-                            <div class="metric-label">Core ({portfolio['core_pct']:.0f}%)</div>
-                            <div class="metric-value">${portfolio['core_value']:,.0f}</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Core-Plus ({portfolio['coreplus_pct']:.0f}%)</div>
-                            <div class="metric-value">${portfolio['coreplus_value']:,.0f}</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Satellite ({portfolio['satellite_pct']:.0f}%)</div>
-                            <div class="metric-value">${portfolio['satellite_value']:,.0f}</div>
-                        </div>
+                        {tier_cards_html}
                     </div>
                 </div>
             </div>
@@ -573,7 +612,10 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     for holding in holdings:
         symbol = holding["symbol"]
         val = valuation.get(symbol, {})
-        
+        gain_loss_pct = val.get('gain_loss_pct', 0)
+        bar_width = max(0, min(100, abs(gain_loss_pct)))
+        bar_color = '#27ae60' if gain_loss_pct >= 0 else '#e74c3c'
+
         html += f"""
                 <div class="holding-card">
                     <h3>
@@ -594,10 +636,10 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     </div>
                     <div class="holding-stat">
                         <label>Gain/Loss:</label>
-                        <span class="{'positive' if val.get('gain_loss_pct', 0) >= 0 else 'negative'}">{val.get('gain_loss_pct', 0):.1f}%</span>
+                        <span class="{'positive' if gain_loss_pct >= 0 else 'negative'}">{gain_loss_pct:.1f}%</span>
                     </div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: {max(0, min(100, val.get('gain_loss_pct', 0) + 50))}%"></div>
+                        <div class="progress-fill" style="width: {bar_width}%; background: {bar_color};"></div>
                     </div>
                 </div>
 """
@@ -609,28 +651,18 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
         <!-- SECTION 3: MACRO MONITOR -->
         <div class="section">
             <h2>Macro Monitor</h2>
+            <p style="font-size: 12px; color: #666; margin-top: -10px; margin-bottom: 15px;">
+                Source: MACRO_REGIME (config/settings*.py) — as of {macro_as_of}. Updated via the Stage 0/1/2 review cycle, not a live feed.
+            </p>
             <div class="macro-grid">
 """
-    
-    # Add macro cards
-    macro_items = [
-        ("CPI", f"{macro.get('cpi', 'N/A')}", "Consumer Price Index"),
-        ("PCE", f"{macro.get('pce', 'N/A')}", "Personal Consumption Expenditures"),
-        ("Unemployment", f"{macro.get('unemployment', 'N/A')}%", "Unemployment Rate"),
-        ("Fed Funds", f"{macro.get('fed_funds', 'N/A')}%", "Federal Funds Rate"),
-        ("GDP Growth", f"{macro.get('real_gdp_growth', 'N/A')}%", "Real GDP Growth (YoY)"),
-        ("10Y Yield", f"{macro.get('yield_10y', 'N/A')}%", "10-Year Treasury"),
-        ("2Y Yield", f"{macro.get('yield_2y', 'N/A')}%", "2-Year Treasury"),
-        ("Yield Curve", f"{macro.get('yield_curve', 'N/A')}%", "10Y - 2Y Spread"),
-        ("DXY", f"{macro.get('dxy', 'N/A')}", "USD Dollar Index"),
-    ]
-    
+
     for label, value, desc in macro_items:
         html += f"""
                 <div class="macro-card">
                     <div class="label">{label}</div>
                     <div class="value">{value}</div>
-                    <div style="font-size: 10px; color: #ccc; margin-top: 5px;">{desc}</div>
+                    <div style="font-size: 11px; color: #555; margin-top: 5px; line-height: 1.4;">{desc}</div>
                 </div>
 """
     
@@ -710,8 +742,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
             <div class="appendix">
                 <h4>📊 Data Sources & Refresh Cadence</h4>
                 <p><strong>Holdings & Pricing:</strong> Yahoo Finance (yfinance) — Real-time during market hours</p>
-                <p><strong>Economic Indicators:</strong> Federal Reserve Economic Data (FRED API) — Daily updates</p>
-                <p><strong>Treasury Yields:</strong> Yahoo Finance — Real-time</p>
+                <p><strong>Macro/Regime Data:</strong> MACRO_REGIME dict in config/settings.py or settings_satellite.py — manually refreshed each cycle via the Stage 0/1/2 review workflow (see prompts/), not a live feed. See the "as of" date above the Macro Monitor section.</p>
                 <p><strong>Technical Indicators:</strong> Calculated from 1-year historical price data (yfinance) — Daily</p>
                 <p><strong>Recommended Refresh:</strong> Daily (EOD) for position tracking; Weekly for macro/technical analysis</p>
             </div>
@@ -724,6 +755,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     <script>
         // Allocation Chart (Doughnut)
         const allocationCtx = document.getElementById('allocationChart').getContext('2d');
+        const allocationMembers = {chart_members!r};
         new Chart(allocationCtx, {{
             type: 'doughnut',
             data: {{
@@ -742,6 +774,20 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     legend: {{
                         position: 'bottom',
                         labels: {{ font: {{ size: 12 }} }}
+                    }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                return context.label + ': ' + context.parsed + '%';
+                            }},
+                            afterLabel: function(context) {{
+                                const members = allocationMembers[context.dataIndex];
+                                if (members && members.length) {{
+                                    return 'Stocks: ' + members.join(', ');
+                                }}
+                                return '';
+                            }}
+                        }}
                     }}
                 }}
             }}
