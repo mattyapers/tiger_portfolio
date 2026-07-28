@@ -261,6 +261,26 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     macro_items, macro_as_of = build_macro_cards(settings)
     chart_labels, chart_values, chart_title, chart_members = calculate_allocation_chart(holdings, settings)
 
+    # Stock Deep-Dive Cards: group by sector for the Satellite book (reuses the
+    # sector groupings already computed for the allocation chart above — no
+    # extra yfinance calls). Core/Core-Plus book has no sector concept here,
+    # cards stay in their existing order.
+    is_satellite_book = 'Satellite' in settings.TIER_TARGETS
+    if is_satellite_book:
+        symbol_to_sector = {}
+        for sector, members in zip(chart_labels, chart_members):
+            for sym in members:
+                symbol_to_sector[sym] = sector
+        sector_rank = {sector: i for i, sector in enumerate(chart_labels)}
+        holding_values = {h["symbol"]: h["shares"] * h["latest_price"] for h in holdings}
+        card_holdings = sorted(
+            holdings,
+            key=lambda h: (sector_rank.get(symbol_to_sector.get(h["symbol"]), 999), -holding_values[h["symbol"]])
+        )
+    else:
+        symbol_to_sector = {}
+        card_holdings = holdings
+
     # Only render a tier card for tiers this book actually has (e.g. Satellite
     # book has no Core/Core-Plus tier — showing a $0 card for it is noise).
     tier_card_defs = [
@@ -407,6 +427,20 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 15px;
+        }}
+        .sector-divider {{
+            grid-column: 1 / -1;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            padding-bottom: 6px;
+            margin-top: 10px;
+            border-bottom: 2px solid #1f77b4;
+        }}
+        .sector-divider:first-child {{
+            margin-top: 0;
         }}
         .holding-card {{
             background: #f9f9f9;
@@ -609,12 +643,20 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
 """
     
     # Add holding cards — filtered to this book's TICKER_TIERS (see calculate_portfolio_overview)
-    for holding in holdings:
+    last_sector = None
+    for holding in card_holdings:
         symbol = holding["symbol"]
         val = valuation.get(symbol, {})
         gain_loss_pct = val.get('gain_loss_pct', 0)
         bar_width = max(0, min(100, abs(gain_loss_pct)))
         bar_color = '#27ae60' if gain_loss_pct >= 0 else '#e74c3c'
+
+        sector = symbol_to_sector.get(symbol)
+        if is_satellite_book and sector != last_sector:
+            html += f"""
+                <div class="sector-divider">{sector}</div>
+"""
+            last_sector = sector
 
         html += f"""
                 <div class="holding-card">
