@@ -163,17 +163,19 @@ After removing a Satellite position: remove from `TICKER_TIERS`/`SATELLITE_TARGE
 
 ## Prompts Directory
 
-`prompts/` contains three Claude prompts for weekly review cycle. Run in order each 14-day cycle. Treat as static input files — do not modify.
+`prompts/` contains three Claude prompts for the weekly review cycle, chained: Stage 0's output feeds Stage 1's open questions; Stage 1's rendered output pastes verbatim into Stage 2's CURRENT REGIME section (field order matches on purpose — no manual reformatting step between them). Run in order each 14-day cycle, against **both** settings modules — the pipeline is a two-book system now, not one.
 
 | File | Stage | Role | Key constraint |
 |---|---|---|---|
-| `stage0_freshness_check.md` | 0 | Staleness triage | No web search; deterministic logic only |
-| `stage1_macro_regime.md` | 1 | Macro data fetch | Outputs paste-ready `MACRO_REGIME` dict for `config/settings.py` |
-| `stage2_weekly_review.md` | 2 | Full portfolio review | Requires attached `output/portfolio_tracker.xlsx` |
+| `stage0_freshness_check.md` | 0 | Staleness + desync triage | No web search; deterministic logic only; reads DATA_FRESHNESS/MACRO_REGIME from both `settings.py` and `settings_satellite.py`, flags it if the two MACRO_REGIME copies disagree |
+| `stage1_macro_regime.md` | 1 | Macro data fetch | Outputs a paste-ready `MACRO_REGIME` dict for **both** settings modules (same content, duplicated field) + a rendered block for Stage 2 |
+| `stage2_weekly_review.md` | 2 | Full portfolio review | Requires both `output/portfolio_tracker.xlsx` and `output/satellite_tracker.xlsx` attached |
 
-Stage 0 verdict gates the rest: GREEN skips to Stage 1; RED means update stale `settings.py` fields before continuing.
+Stage 0 verdict gates the rest: GREEN skips to Stage 1; RED means update stale/desynced fields before continuing.
 
-Stage 1 dict uses shortened keys (`ffr`, `bs`, `pce_h`, `pce_c`, `fw_next`, `fw_dec`, `b_dist`) — map to full key names already in `config/settings.py` when pasting.
+Stage 1 dict uses shortened keys (`ffr`, `bs`, `pce_h`, `pce_c`, `fw_next`, `fw_dec`, `b_dist`) — map to full key names already in both settings modules when pasting.
+
+**These files are living documents, not static templates** — each stage is responsible for bumping the `DATA_FRESHNESS['...']['value']` entry it just refreshed (in both settings modules where the field is shared) as its last step. A stage that reads/confirms data without bumping the corresponding freshness value leaves next cycle's Stage 0 blind to the fact a review happened — that's the main failure mode this chaining is designed to close. Edit `stage2_weekly_review.md`'s CURRENT REGIME section weekly (Stage 1 output goes there); edit `stage0`/`stage1` only when the process itself needs to change (as done 2026-07-28 to make the three stages dual-book aware).
 
 ---
 
