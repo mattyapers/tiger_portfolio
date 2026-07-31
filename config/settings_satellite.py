@@ -299,6 +299,21 @@ WATCHLIST = {
         'target_price': None,
         'note': 'European defense ETF — NATO rearmament',
     },
+    'GRMN': {
+        'ticker': 'GRMN',
+        'action': 'WATCH',
+        'target_price': None,
+        'note': (
+            'SEPA check 2026-07-28: Stage 2, all 8 trend-template conditions pass '
+            '(new 52wk high, RS +36.5% 12mo vs S&P +16.9%). Fundamentals grade B — '
+            'revenue growth +15.1% FY25/+20.4% FY24 clears the 15% health floor, '
+            'gross margin stable ~58.7%, earnings beats accelerating (inline -> '
+            '+16.6% -> +13.1% -> +22.5%, 4 quarters). No pattern/pivot currently — '
+            'extended at highs with no visible base. Wait for first meaningful '
+            'pullback/consolidation before sizing an entry. Next earnings Oct 28, 2026.'
+        ),
+        'review_date': '2026-07-28',
+    },
     'DBS': {
         'ticker': 'D05.SI',   # bare 'DBS' resolves to Invesco DB Silver Fund on Yahoo/yfinance, wrong instrument
         'target_price': None,
@@ -365,6 +380,7 @@ WATCHLIST_REGIME_FIT = {
     'XLE':  {'score': '✅', 'reason': 'Energy hedge; stagflation alpha'},
     'CAT':  {'score': '⚠️', 'reason': 'Industrial compounder; P/E elevated vs 5Y avg'},
     'MSFT': {'score': '❌', 'reason': 'High multiple; long-duration growth proxy; QB fit not D'},
+    'GRMN': {'score': '⚠️', 'reason': 'Quality consumer-tech compounder, real revenue growth + FCF, but not a stagflation hedge — no pricing-power/hard-asset/defense angle for Quadrant D specifically'},
     'LMT':  {'score': '✅', 'reason': 'Defense; NATO spending catalyst; FCF compounder'},
     'EUAD': {'score': '✅', 'reason': 'European defense ETF; NATO rearmament theme'},
     'D05.SI': {'score': '⚠️', 'reason': 'SGD base + ASEAN growth; rate-sensitive NIM compression risk'},
