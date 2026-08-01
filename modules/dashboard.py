@@ -812,7 +812,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                 </div>
 """
 
-    html += """
+    html += f"""
             </div>
         </div>
 
