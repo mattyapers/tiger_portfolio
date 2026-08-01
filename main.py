@@ -71,6 +71,45 @@ from modules.screener import run_screener
 from modules.dashboard import generate_html_dashboard
 
 
+def _append_nav_history(summary, settings):
+    """
+    Append today's NAV to this book's NAV_HISTORY_PATH, so since-inception/
+    YTD/monthly return metrics have something to compute against — no such
+    history existed before this was added, so those metrics only become
+    accurate from whichever day tracking started, not retroactively.
+
+    One entry per calendar day: re-running the pipeline same-day overwrites
+    that day's entry rather than appending a duplicate.
+    """
+    import json
+
+    path = getattr(settings, 'NAV_HISTORY_PATH', 'output/nav_history.json')
+    today = datetime.now().strftime('%Y-%m-%d')
+    entry = {
+        'date': today,
+        'total_equity': summary['total_portfolio'],
+        'total_pnl': summary['total_pnl'],
+        'total_realized_pnl': summary.get('total_realized_pnl', 0),
+        'cash_balance': summary.get('cash_balance', 0),
+    }
+
+    history = []
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f:
+                history = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            history = []
+
+    history = [h for h in history if h.get('date') != today]
+    history.append(entry)
+    history.sort(key=lambda h: h['date'])
+
+    with open(path, 'w') as f:
+        json.dump(history, f, indent=2)
+    logger.info(f"  NAV history: {len(history)} day(s) tracked → {path}")
+
+
 def run_pipeline(mode='hybrid'):
     logger.info("=" * 60)
     logger.info(f"PORTFOLIO PIPELINE — Book: {PORTFOLIO.upper()} | Mode: {mode.upper()}")
@@ -106,6 +145,7 @@ def run_pipeline(mode='hybrid'):
     }
 
     summary = analytics['summary']
+    _append_nav_history(summary, settings)
     logger.info(f"  Total portfolio: ${summary['total_portfolio']:,.2f}")
     for tier, target in settings.TIER_TARGETS.items():
         key_map = {'Core': 'core_pct', 'Core-Plus': 'coreplus_pct', 'Satellite': 'satellite_pct'}

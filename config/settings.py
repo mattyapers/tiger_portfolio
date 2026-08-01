@@ -167,6 +167,7 @@ OUTPUT_PATH = 'output/portfolio_tracker.xlsx'
 NAS_PATH = '/volume1/investments/portfolio_tracker.xlsx'
 SNAPSHOT_PATH = 'output/latest_snapshot.json'
 DASHBOARD_PATH = 'output/dashboard.html'
+NAV_HISTORY_PATH = 'output/nav_history_core.json'
 
 # ============================================================
 # SNAPSHOT DATE

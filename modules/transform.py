@@ -322,6 +322,7 @@ def build_portfolio_summary(df, portfolio_totals, tier_drift, account_summary):
         'satellite_pct': portfolio_totals['satellite_value'] / portfolio_totals['total_value'] if portfolio_totals['total_value'] > 0 else 0,
         'total_pnl': df['unrealized_pnl'].sum(),
         'total_pnl_pct': df['unrealized_pnl'].sum() / df['cost_basis'].sum() if df['cost_basis'].sum() > 0 else 0,
+        'total_realized_pnl': df['realized_pnl'].sum() if 'realized_pnl' in df.columns else 0,
         'cash_balance': account_summary.get('cash_balance', 0),
         'positions_count': len(df),
         'satellite_count': len(sat),

@@ -201,6 +201,7 @@ OUTPUT_PATH = 'output/satellite_tracker.xlsx'
 NAS_PATH = '/volume1/investments/satellite_portfolio_tracker.xlsx'
 SNAPSHOT_PATH = 'output/satellite_snapshot.json'
 DASHBOARD_PATH = 'output/satellite_dashboard.html'
+NAV_HISTORY_PATH = 'output/nav_history_satellite.json'
 
 # ============================================================
 # SNAPSHOT DATE

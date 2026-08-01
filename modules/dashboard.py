@@ -148,10 +148,11 @@ def calculate_valuation_metrics(snapshot, settings):
         latest_price = holding["latest_price"]
         avg_cost = holding["avg_cost"]
         pe_ttm = holding.get("pe_ttm")
-        
+
         # Basic metrics from snapshot
         valuation[symbol] = {
             "pe_ttm": pe_ttm,
+            "forward_pe": holding.get("forward_pe"),
             "price_to_cost": round(latest_price / avg_cost, 2) if avg_cost > 0 else 1.0,
             "gain_loss_pct": round((latest_price - avg_cost) / avg_cost * 100, 1),
         }
@@ -181,6 +182,7 @@ def calculate_portfolio_overview(snapshot, settings):
     total_cost = sum(cost_bases)
     total_pnl = total_equity - total_cost
     total_pnl_pct = (total_pnl / total_cost * 100) if total_cost > 0 else 0
+    total_realized_pnl = sum(h.get("realized_pnl", 0) or 0 for h in holdings)
 
     def tier_value(*tiers):
         return sum(mv for h, mv in zip(holdings, market_values) if tier_map[h["symbol"]] in tiers)
@@ -198,6 +200,7 @@ def calculate_portfolio_overview(snapshot, settings):
         "cash": round(account.get("cash_balance", 0), 2),
         "total_pnl": round(total_pnl, 2),
         "total_pnl_pct": round(total_pnl_pct, 2),
+        "total_realized_pnl": round(total_realized_pnl, 2),
         "num_holdings": len(holdings),
         "core_pct": round(core_pct, 1),
         "coreplus_pct": round(coreplus_pct, 1),
@@ -208,33 +211,67 @@ def calculate_portfolio_overview(snapshot, settings):
     }
 
 
+def _sector_of(holding):
+    """
+    GICS sector for a holding. Prefers the value already captured in the
+    snapshot (extract.py saves it per-position now) to avoid a redundant
+    yfinance call; falls back to a live lookup for snapshots saved before
+    that field existed.
+    """
+    sector = holding.get("sector")
+    if sector:
+        return sector
+    try:
+        return yf.Ticker(holding["symbol"]).info.get("sector") or "Unknown"
+    except Exception:
+        return "Unknown"
+
+
+def _country_of(holding):
+    """
+    Primary listing country for a holding (simple geography proxy — where
+    the instrument trades, not where the underlying business earns revenue).
+    Same snapshot-first, yfinance-fallback pattern as _sector_of().
+    """
+    country = holding.get("country")
+    if country:
+        return country
+    try:
+        return yf.Ticker(holding["symbol"]).info.get("country") or "Unknown"
+    except Exception:
+        return "Unknown"
+
+
+def _group_by(holdings, key_fn, total):
+    """Group holdings' market value by an arbitrary key function, ranked descending."""
+    groups = {}
+    for h in holdings:
+        mv = h["shares"] * h["latest_price"]
+        key = key_fn(h) or "Unknown"
+        g = groups.setdefault(key, {"value": 0.0, "members": []})
+        g["value"] += mv
+        g["members"].append(h["symbol"])
+    ranked = sorted(groups.items(), key=lambda kv: -kv[1]["value"])
+    labels = [k for k, _ in ranked]
+    values = [round(v["value"] / total * 100, 1) if total > 0 else 0 for _, v in ranked]
+    members = [v["members"] for _, v in ranked]
+    return labels, values, members
+
+
 def calculate_allocation_chart(holdings, settings):
     """
     Build the doughnut-chart breakdown.
 
     Core/Core-Plus book: by individual ticker (no Satellite tier there, so a
     tier pie is just "Core" vs "Core-Plus" — individual holdings are more useful).
-    Satellite book: by GICS sector (yfinance) — a per-ticker pie is too granular
-    for a 100%-Satellite book where the interesting question is sector concentration.
+    Satellite book: by GICS sector — a per-ticker pie is too granular for a
+    100%-Satellite book where the interesting question is sector concentration.
     """
     total = sum(h["shares"] * h["latest_price"] for h in holdings)
     is_satellite_book = 'Satellite' in settings.TIER_TARGETS
 
     if is_satellite_book:
-        sector_groups = {}
-        for h in holdings:
-            mv = h["shares"] * h["latest_price"]
-            try:
-                sector = yf.Ticker(h["symbol"]).info.get("sector") or "Unknown"
-            except Exception:
-                sector = "Unknown"
-            g = sector_groups.setdefault(sector, {"value": 0.0, "members": []})
-            g["value"] += mv
-            g["members"].append(h["symbol"])
-        ranked = sorted(sector_groups.items(), key=lambda kv: -kv[1]["value"])
-        labels = [k for k, _ in ranked]
-        values = [round(v["value"] / total * 100, 1) if total > 0 else 0 for _, v in ranked]
-        members = [v["members"] for _, v in ranked]
+        labels, values, members = _group_by(holdings, _sector_of, total)
         chart_title = "Allocation by Sector"
     else:
         ranked = sorted(holdings, key=lambda h: -(h["shares"] * h["latest_price"]))
@@ -244,6 +281,22 @@ def calculate_allocation_chart(holdings, settings):
         chart_title = "Allocation by Holding"
 
     return labels, values, chart_title, members
+
+
+def calculate_exposure_charts(holdings):
+    """
+    Build Sector Exposure and Geography Exposure doughnut charts — shown on
+    both books, independent of the main allocation chart above. Geography is
+    a simple proxy: primary listing country (yfinance 'country' field), not
+    a look-through of where the underlying business earns revenue.
+    """
+    total = sum(h["shares"] * h["latest_price"] for h in holdings)
+    sector_labels, sector_values, sector_members = _group_by(holdings, _sector_of, total)
+    geo_labels, geo_values, geo_members = _group_by(holdings, _country_of, total)
+    return {
+        "sector": (sector_labels, sector_values, sector_members),
+        "geography": (geo_labels, geo_values, geo_members),
+    }
 
 
 def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json", output_path="output/dashboard.html"):
@@ -260,6 +313,9 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     technical = fetch_technical_data(symbols)
     macro_items, macro_as_of = build_macro_cards(settings)
     chart_labels, chart_values, chart_title, chart_members = calculate_allocation_chart(holdings, settings)
+    exposure = calculate_exposure_charts(holdings)
+    sector_labels, sector_values, sector_members = exposure["sector"]
+    geo_labels, geo_values, geo_members = exposure["geography"]
 
     # Stock Deep-Dive Cards: group by sector for the Satellite book (reuses the
     # sector groupings already computed for the allocation chart above — no
@@ -597,7 +653,8 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
         <!-- SECTION 1: PORTFOLIO OVERVIEW -->
         <div class="section">
             <h2>Portfolio Overview</h2>
-            
+
+            <h3 style="font-size: 13px; color: #666; text-transform: uppercase; margin-bottom: 10px;">Absolute</h3>
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-label">Total Equity</div>
@@ -608,12 +665,12 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     <div class="metric-value">${portfolio['cash']:,.0f}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Unrealized P&L</div>
+                    <div class="metric-label">Unrealized P&L<span class="info-tip" data-tip="Market Value - Cost Basis on currently open positions in this book. Paper gain/loss only -- reverses if the price moves back before you sell.">i</span></div>
                     <div class="metric-value {'positive' if portfolio['total_pnl'] >= 0 else 'negative'}">${portfolio['total_pnl']:,.0f}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Return %<span class="info-tip" data-tip="Unrealized P&amp;L / Total Cost Basis x 100. Cost Basis = sum(shares x avg_cost) across this book's holdings only. This is a simple aggregate return on cost, NOT time-weighted (TWR) or money-weighted (XIRR/IRR) -- it doesn't account for when each tranche was bought. Excludes dividends received and any realized gains/losses from closed positions.">i</span></div>
-                    <div class="metric-value {'positive' if portfolio['total_pnl_pct'] >= 0 else 'negative'}">{portfolio['total_pnl_pct']:.2f}%</div>
+                    <div class="metric-label">Realized P&L<span class="info-tip" data-tip="Cumulative gain/loss locked in on positions already closed or partially closed in this book, as reported by Tiger. A separate dimension from Unrealized P&amp;L above -- this money is booked and can't reverse.">i</span></div>
+                    <div class="metric-value {'positive' if portfolio['total_realized_pnl'] >= 0 else 'negative'}">${portfolio['total_realized_pnl']:,.0f}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">Holdings</div>
@@ -621,7 +678,16 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
+            <h3 style="font-size: 13px; color: #666; text-transform: uppercase; margin: 20px 0 10px;">Metrics</h3>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Return on Cost %<span class="info-tip" data-tip="Unrealized P&amp;L / Total Cost Basis x 100. Cost Basis = sum(shares x avg_cost) across this book's holdings only. This is a simple aggregate return on cost, NOT time-weighted (TWR) or money-weighted (XIRR/IRR) -- it doesn't account for when each tranche was bought, and excludes dividends received and realized gains/losses. Since-inception/YTD/monthly TWR figures require a NAV history and will populate here once enough snapshots have accumulated (see output/nav_history*.json).">i</span></div>
+                    <div class="metric-value {'positive' if portfolio['total_pnl_pct'] >= 0 else 'negative'}">{portfolio['total_pnl_pct']:.2f}%</div>
+                </div>
+                {tier_cards_html}
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; align-items: start; margin-top: 20px;">
                 <div>
                     <h3 style="font-size: 14px; margin-bottom: 15px;">{chart_title}</h3>
                     <div class="allocation-chart">
@@ -629,8 +695,15 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     </div>
                 </div>
                 <div>
-                    <div class="metrics-grid">
-                        {tier_cards_html}
+                    <h3 style="font-size: 14px; margin-bottom: 15px;">Exposure by Sector</h3>
+                    <div class="allocation-chart">
+                        <canvas id="sectorExposureChart"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <h3 style="font-size: 14px; margin-bottom: 15px;">Exposure by Geography<span class="info-tip" data-tip="Primary listing country (where the instrument trades), not a look-through of where the underlying business earns its revenue.">i</span></h3>
+                    <div class="allocation-chart">
+                        <canvas id="geoExposureChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -677,6 +750,10 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                         <span>{val.get('pe_ttm', 'N/A')}</span>
                     </div>
                     <div class="holding-stat">
+                        <label>P/E (Fwd):</label>
+                        <span>{val.get('forward_pe', 'N/A')}</span>
+                    </div>
+                    <div class="holding-stat">
                         <label>Gain/Loss:</label>
                         <span class="{'positive' if gain_loss_pct >= 0 else 'negative'}">{gain_loss_pct:.1f}%</span>
                     </div>
@@ -686,7 +763,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                 </div>
 """
     
-    html += """
+    html += f"""
             </div>
         </div>
 
@@ -828,6 +905,68 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                                     return 'Stocks: ' + members.join(', ');
                                 }}
                                 return '';
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }});
+
+        // Sector Exposure Chart (Doughnut)
+        const sectorCtx = document.getElementById('sectorExposureChart').getContext('2d');
+        new Chart(sectorCtx, {{
+            type: 'doughnut',
+            data: {{
+                labels: {sector_labels!r},
+                datasets: [{{
+                    data: {sector_values!r},
+                    backgroundColor: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#aec7e8', '#ffbb78', '#98df8a', '#ff9896'],
+                    borderColor: '#fff',
+                    borderWidth: 2
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{ position: 'bottom', labels: {{ font: {{ size: 11 }} }} }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{ return context.label + ': ' + context.parsed + '%'; }},
+                            afterLabel: function(context) {{
+                                const members = {sector_members!r}[context.dataIndex];
+                                return members && members.length ? 'Stocks: ' + members.join(', ') : '';
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }});
+
+        // Geography Exposure Chart (Doughnut)
+        const geoCtx = document.getElementById('geoExposureChart').getContext('2d');
+        new Chart(geoCtx, {{
+            type: 'doughnut',
+            data: {{
+                labels: {geo_labels!r},
+                datasets: [{{
+                    data: {geo_values!r},
+                    backgroundColor: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#aec7e8', '#ffbb78', '#98df8a', '#ff9896'],
+                    borderColor: '#fff',
+                    borderWidth: 2
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{ position: 'bottom', labels: {{ font: {{ size: 11 }} }} }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{ return context.label + ': ' + context.parsed + '%'; }},
+                            afterLabel: function(context) {{
+                                const members = {geo_members!r}[context.dataIndex];
+                                return members && members.length ? 'Stocks: ' + members.join(', ') : '';
                             }}
                         }}
                     }}

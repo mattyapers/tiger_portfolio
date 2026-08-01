@@ -153,11 +153,14 @@ def _fetch_yfinance_data(symbols):
                 'latest_price': float(price) if price else None,
                 'pe_ttm': info.get('trailingPE'),
                 'forward_pe': info.get('forwardPE'),
+                'forward_eps': info.get('forwardEps'),
+                'trailing_eps': info.get('trailingEps'),
                 'dividend_yield': info.get('dividendYield'),
                 'market_cap': info.get('marketCap'),
                 'fifty_two_wk_high': info.get('fiftyTwoWeekHigh'),
                 'fifty_two_wk_low': info.get('fiftyTwoWeekLow'),
                 'sector': info.get('sector'),
+                'country': info.get('country'),
             })
 
         except Exception as e:
@@ -166,9 +169,10 @@ def _fetch_yfinance_data(symbols):
                 'symbol': sym,
                 'latest_price': float(price) if price else None,
                 'pe_ttm': None, 'forward_pe': None,
+                'forward_eps': None, 'trailing_eps': None,
                 'dividend_yield': None, 'market_cap': None,
                 'fifty_two_wk_high': None, 'fifty_two_wk_low': None,
-                'sector': None,
+                'sector': None, 'country': None,
             })
             logger.warning(f"  {sym}: info failed ({type(e).__name__}), batch price={'${:.2f}'.format(price) if price else 'N/A'}")
 
@@ -191,7 +195,9 @@ def _merge_and_fix(tiger_df, yf_df, settings):
     If off by >5x, assumes shares are inflated and recalculates.
     """
     df = tiger_df.merge(yf_df[['symbol', 'latest_price', 'pe_ttm', 'forward_pe',
-                                'dividend_yield', 'fifty_two_wk_high', 'fifty_two_wk_low']],
+                                'forward_eps', 'trailing_eps', 'dividend_yield',
+                                'fifty_two_wk_high', 'fifty_two_wk_low',
+                                'sector', 'country']],
                         on='symbol', how='left')
 
     # Detect inflated share counts
@@ -304,6 +310,11 @@ def _save_snapshot(result, settings):
             'avg_cost': round(float(row.get('avg_cost', 0)), 4),
             'latest_price': round(float(row.get('latest_price', 0)), 4),
             'pe_ttm': round(float(row['pe_ttm']), 2) if pd.notna(row.get('pe_ttm')) else None,
+            'forward_pe': round(float(row['forward_pe']), 2) if pd.notna(row.get('forward_pe')) else None,
+            'realized_pnl': round(float(row['realized_pnl']), 2) if pd.notna(row.get('realized_pnl')) else 0.0,
+            'sector': row.get('sector') if pd.notna(row.get('sector')) else None,
+            'country': row.get('country') if pd.notna(row.get('country')) else None,
+            'dividend_yield': round(float(row['dividend_yield']), 4) if pd.notna(row.get('dividend_yield')) else None,
         })
 
     os.makedirs('output', exist_ok=True)
@@ -358,6 +369,14 @@ def extract_yf_only(settings):
         pe = price_map.loc[sym, 'pe_ttm']
         if pd.notna(pe):
             df.loc[df['symbol'] == sym, 'pe_ttm'] = pe
+
+        for col in ('forward_pe', 'sector', 'country', 'dividend_yield'):
+            val = price_map.loc[sym, col]
+            if pd.notna(val):
+                df.loc[df['symbol'] == sym, col] = val
+
+    if 'realized_pnl' not in df.columns:
+        df['realized_pnl'] = 0.0
 
     offline['positions'] = df
     offline['quotes'] = yf_df
