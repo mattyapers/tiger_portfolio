@@ -472,6 +472,8 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
         }}
         .allocation-chart {{
             max-width: 400px;
+            height: 280px;
+            position: relative;
             margin: 0 auto 30px;
         }}
         .holdings-grid {{
