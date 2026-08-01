@@ -229,15 +229,19 @@ def _sector_of(holding):
 
 def _country_of(holding):
     """
-    Primary listing country for a holding (simple geography proxy — where
-    the instrument trades, not where the underlying business earns revenue).
-    Same snapshot-first, yfinance-fallback pattern as _sector_of().
+    Listing-exchange geography for a holding: where the instrument trades
+    (e.g. a US-listed ADR is 'United States' regardless of where the
+    underlying business is headquartered), not a revenue look-through.
+    Same snapshot-first, live-fallback pattern as _sector_of() — falls back
+    to a live yfinance lookup only for snapshots saved before this field
+    existed.
     """
     country = holding.get("country")
     if country:
         return country
     try:
-        return yf.Ticker(holding["symbol"]).info.get("country") or "Unknown"
+        from modules.extract import _listing_country
+        return _listing_country(yf.Ticker(holding["symbol"]).info or {}) or "Unknown"
     except Exception:
         return "Unknown"
 
@@ -260,25 +264,17 @@ def _group_by(holdings, key_fn, total):
 
 def calculate_allocation_chart(holdings, settings):
     """
-    Build the doughnut-chart breakdown.
-
-    Core/Core-Plus book: by individual ticker (no Satellite tier there, so a
-    tier pie is just "Core" vs "Core-Plus" — individual holdings are more useful).
-    Satellite book: by GICS sector — a per-ticker pie is too granular for a
-    100%-Satellite book where the interesting question is sector concentration.
+    Build the main allocation doughnut chart — by individual ticker, for
+    both books. Sector concentration has its own dedicated Exposure by
+    Sector chart (calculate_exposure_charts()), so this one doesn't need
+    to duplicate that view for the Satellite book anymore.
     """
     total = sum(h["shares"] * h["latest_price"] for h in holdings)
-    is_satellite_book = 'Satellite' in settings.TIER_TARGETS
-
-    if is_satellite_book:
-        labels, values, members = _group_by(holdings, _sector_of, total)
-        chart_title = "Allocation by Sector"
-    else:
-        ranked = sorted(holdings, key=lambda h: -(h["shares"] * h["latest_price"]))
-        labels = [h["symbol"] for h in ranked]
-        values = [round((h["shares"] * h["latest_price"]) / total * 100, 1) if total > 0 else 0 for h in ranked]
-        members = [[] for _ in ranked]
-        chart_title = "Allocation by Holding"
+    ranked = sorted(holdings, key=lambda h: -(h["shares"] * h["latest_price"]))
+    labels = [h["symbol"] for h in ranked]
+    values = [round((h["shares"] * h["latest_price"]) / total * 100, 1) if total > 0 else 0 for h in ranked]
+    members = [[] for _ in ranked]
+    chart_title = "Allocation by Holding"
 
     return labels, values, chart_title, members
 
@@ -318,16 +314,15 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     geo_labels, geo_values, geo_members = exposure["geography"]
 
     # Stock Deep-Dive Cards: group by sector for the Satellite book (reuses the
-    # sector groupings already computed for the allocation chart above — no
-    # extra yfinance calls). Core/Core-Plus book has no sector concept here,
-    # cards stay in their existing order.
+    # sector exposure groupings computed above — no extra yfinance calls).
+    # Core/Core-Plus book has no sector concept here, cards stay in order.
     is_satellite_book = 'Satellite' in settings.TIER_TARGETS
     if is_satellite_book:
         symbol_to_sector = {}
-        for sector, members in zip(chart_labels, chart_members):
+        for sector, members in zip(sector_labels, sector_members):
             for sym in members:
                 symbol_to_sector[sym] = sector
-        sector_rank = {sector: i for i, sector in enumerate(chart_labels)}
+        sector_rank = {sector: i for i, sector in enumerate(sector_labels)}
         holding_values = {h["symbol"]: h["shares"] * h["latest_price"] for h in holdings}
         card_holdings = sorted(
             holdings,
@@ -481,7 +476,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
         }}
         .holdings-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 15px;
         }}
         .sector-divider {{
@@ -561,35 +556,6 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
             font-weight: 600;
             color: #333;
             line-height: 1.3;
-        }}
-        .technical-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 15px;
-        }}
-        .technical-card {{
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #e0e0e0;
-        }}
-        .technical-card h4 {{
-            font-size: 14px;
-            margin-bottom: 10px;
-            font-weight: 600;
-        }}
-        .technical-row {{
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 0;
-            font-size: 12px;
-        }}
-        .technical-row .label {{
-            color: #999;
-        }}
-        .technical-row .value {{
-            font-weight: 600;
-            color: #333;
         }}
         .rsi {{
             padding: 10px;
@@ -701,7 +667,7 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     </div>
                 </div>
                 <div>
-                    <h3 style="font-size: 14px; margin-bottom: 15px;">Exposure by Geography<span class="info-tip" data-tip="Primary listing country (where the instrument trades), not a look-through of where the underlying business earns its revenue.">i</span></h3>
+                    <h3 style="font-size: 14px; margin-bottom: 15px;">Exposure by Geography<span class="info-tip" data-tip="Based on the exchange the instrument is listed/bought on -- e.g. a stock bought on a US exchange counts as United States exposure, even if the underlying company is headquartered elsewhere (ADRs, foreign-domiciled listings). Not a look-through of where the business actually earns its revenue.">i</span></h3>
                     <div class="allocation-chart">
                         <canvas id="geoExposureChart"></canvas>
                     </div>
@@ -715,11 +681,15 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
             <div class="holdings-grid">
 """
     
-    # Add holding cards — filtered to this book's TICKER_TIERS (see calculate_portfolio_overview)
+    # Add holding cards — combines valuation + technical snapshot in one card
+    # per symbol, so everything about a position is visible without jumping
+    # between sections. Filtered to this book's TICKER_TIERS (see
+    # calculate_portfolio_overview).
     last_sector = None
     for holding in card_holdings:
         symbol = holding["symbol"]
         val = valuation.get(symbol, {})
+        tech = technical.get(symbol, {})
         gain_loss_pct = val.get('gain_loss_pct', 0)
         bar_width = max(0, min(100, abs(gain_loss_pct)))
         bar_color = '#27ae60' if gain_loss_pct >= 0 else '#e74c3c'
@@ -730,6 +700,29 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                 <div class="sector-divider">{sector}</div>
 """
             last_sector = sector
+
+        # Golden cross (50D > 200D, bullish trend) / death cross (bearish) —
+        # only meaningful once both MAs exist.
+        ma_50 = tech.get('ma_50')
+        ma_200 = tech.get('ma_200')
+        if ma_50 is not None and ma_200 is not None:
+            if ma_50 > ma_200:
+                cross_label, cross_class = 'Golden Cross (bullish)', 'positive'
+            else:
+                cross_label, cross_class = 'Death Cross (bearish)', 'negative'
+            cross_tip = 'data-tip="50D MA above 200D MA = shorter-term trend running above the longer-term trend (golden cross, bullish). Below = death cross, bearish. Distance from each MA (below) shows how extended price is versus that trend line."'
+        else:
+            cross_label, cross_class, cross_tip = 'N/A', '', ''
+
+        rsi = tech.get('rsi')
+        if rsi is None:
+            rsi_class, rsi_label = 'neutral', 'N/A'
+        elif rsi > 70:
+            rsi_class, rsi_label = 'overbought', 'Overbought'
+        elif rsi < 30:
+            rsi_class, rsi_label = 'oversold', 'Oversold'
+        else:
+            rsi_class, rsi_label = 'neutral', 'Neutral'
 
         html += f"""
                 <div class="holding-card">
@@ -760,9 +753,41 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: {bar_width}%; background: {bar_color};"></div>
                     </div>
+                    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 10px 0;">
+                    <div class="holding-stat">
+                        <label>52W High:</label>
+                        <span>{'$' + format(tech['high_52w'], '.2f') if 'high_52w' in tech else 'N/A'}</span>
+                    </div>
+                    <div class="holding-stat">
+                        <label>52W Low:</label>
+                        <span>{'$' + format(tech['low_52w'], '.2f') if 'low_52w' in tech else 'N/A'}</span>
+                    </div>
+                    <div class="holding-stat">
+                        <label>From 52W High:</label>
+                        <span style="color: #666;">{format(tech['dist_from_high'], '.1f') + '%' if 'dist_from_high' in tech else 'N/A'}</span>
+                    </div>
+                    <div class="holding-stat">
+                        <label>From 52W Low:</label>
+                        <span style="color: #27ae60;">{format(tech['dist_from_low'], '.1f') + '%' if 'dist_from_low' in tech else 'N/A'}</span>
+                    </div>
+                    <div class="holding-stat">
+                        <label>50D MA / 200D MA:</label>
+                        <span>{('$' + format(ma_50, '.2f') + ' / $' + format(ma_200, '.2f')) if ma_50 is not None and ma_200 is not None else 'N/A'}</span>
+                    </div>
+                    <div class="holding-stat">
+                        <label>vs 50D / vs 200D:</label>
+                        <span>{(format(tech['ma_50_pct'], '.1f') + '% / ' + format(tech['ma_200_pct'], '.1f') + '%') if 'ma_50_pct' in tech else 'N/A'}</span>
+                    </div>
+                    <div class="holding-stat">
+                        <label>Trend:<span class="info-tip" {cross_tip}>i</span></label>
+                        <span class="{cross_class}">{cross_label}</span>
+                    </div>
+                    <div class="rsi {rsi_class}">
+                        RSI (14): {format(rsi, '.1f') if rsi is not None else 'N/A'} — {rsi_label}
+                    </div>
                 </div>
 """
-    
+
     html += f"""
             </div>
         </div>
@@ -784,75 +809,8 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
                     <div style="font-size: 11px; color: #555; margin-top: 5px; line-height: 1.4;">{desc}</div>
                 </div>
 """
-    
-    html += """
-            </div>
-        </div>
 
-        <!-- SECTION 4: TECHNICAL SNAPSHOT -->
-        <div class="section">
-            <h2>Technical Snapshot</h2>
-            <div class="technical-grid">
-"""
-    
-    # Add technical cards for symbols with data
-    for symbol in symbols:
-        if symbol in technical:
-            tech = technical[symbol]
-            rsi = tech.get("rsi", 50)
-            
-            if rsi > 70:
-                rsi_class = "overbought"
-                rsi_label = "Overbought"
-            elif rsi < 30:
-                rsi_class = "oversold"
-                rsi_label = "Oversold"
-            else:
-                rsi_class = "neutral"
-                rsi_label = "Neutral"
-            
-            html += f"""
-                <div class="technical-card">
-                    <h4>{symbol}</h4>
-                    <div class="technical-row">
-                        <span class="label">52W High:</span>
-                        <span class="value">${tech['high_52w']:.2f}</span>
-                    </div>
-                    <div class="technical-row">
-                        <span class="label">52W Low:</span>
-                        <span class="value">${tech['low_52w']:.2f}</span>
-                    </div>
-                    <div class="technical-row">
-                        <span class="label">From 52W High:</span>
-                        <span class="value" style="color: #999;">{tech['dist_from_high']:.1f}%</span>
-                    </div>
-                    <div class="technical-row">
-                        <span class="label">From 52W Low:</span>
-                        <span class="value" style="color: #27ae60;">{tech['dist_from_low']:.1f}%</span>
-                    </div>
-                    <div class="technical-row">
-                        <span class="label">50D MA:</span>
-                        <span class="value">${tech['ma_50']:.2f}</span>
-                    </div>
-                    <div class="technical-row">
-                        <span class="label">vs 50D MA:</span>
-                        <span class="value">{tech['ma_50_pct']:.1f}%</span>
-                    </div>
-                    <div class="technical-row">
-                        <span class="label">200D MA:</span>
-                        <span class="value">${tech['ma_200']:.2f}</span>
-                    </div>
-                    <div class="technical-row">
-                        <span class="label">vs 200D MA:</span>
-                        <span class="value">{tech['ma_200_pct']:.1f}%</span>
-                    </div>
-                    <div class="rsi {rsi_class}">
-                        RSI (14): {rsi:.1f} — {rsi_label}
-                    </div>
-                </div>
-"""
-    
-    html += f"""
+    html += """
             </div>
         </div>
 

@@ -28,6 +28,42 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+# yfinance 'exchange' code -> listing country. This is deliberately about
+# WHERE THE INSTRUMENT TRADES, not where the underlying company is
+# headquartered (e.g. TSM trades as a US ADR on NYSE -> 'United States',
+# even though the business is Taiwanese) — that's the geography exposure
+# definition the dashboard uses.
+EXCHANGE_COUNTRY_MAP = {
+    'NMS': 'United States', 'NYQ': 'United States', 'NGM': 'United States',
+    'NCM': 'United States', 'ASE': 'United States', 'PCX': 'United States',
+    'BTS': 'United States', 'PNK': 'United States',
+    'SES': 'Singapore', 'SGX': 'Singapore',
+    'HKG': 'Hong Kong',
+    'LSE': 'United Kingdom', 'LSIN': 'United Kingdom',
+    'TOR': 'Canada', 'TSX': 'Canada',
+    'ASX': 'Australia',
+    'GER': 'Germany', 'FRA': 'Germany', 'ETR': 'Germany',
+    'PAR': 'France',
+    'TYO': 'Japan', 'JPX': 'Japan',
+    'SHH': 'China', 'SHZ': 'China',
+    'KSC': 'South Korea', 'KOE': 'South Korea',
+    'TAI': 'Taiwan', 'TWO': 'Taiwan',
+    'BSE': 'India', 'NSI': 'India',
+}
+
+
+def _listing_country(info):
+    """
+    Resolve listing-exchange geography from yfinance's 'exchange' code.
+    Falls back to the 'country' field (company HQ) only if the exchange
+    code isn't in the map, so unmapped exchanges don't come back blank.
+    """
+    exchange = info.get('exchange')
+    if exchange and exchange in EXCHANGE_COUNTRY_MAP:
+        return EXCHANGE_COUNTRY_MAP[exchange]
+    return info.get('country')
+
+
 # ════════════════════════════════════════════════════════════
 # TIGER API — What you OWN (free tier)
 # ════════════════════════════════════════════════════════════
@@ -160,7 +196,7 @@ def _fetch_yfinance_data(symbols):
                 'fifty_two_wk_high': info.get('fiftyTwoWeekHigh'),
                 'fifty_two_wk_low': info.get('fiftyTwoWeekLow'),
                 'sector': info.get('sector'),
-                'country': info.get('country'),
+                'country': _listing_country(info),
             })
 
         except Exception as e:
