@@ -185,7 +185,7 @@ Installed globally (user scope, all Claude Code sessions — not project config,
 
 | Plugin | Source | Use for |
 |---|---|---|
-| `finance-market-analysis` | `himself65/finance-skills` | DCF/relative/SOTP valuation, earnings preview/recap, ETF premium-discount, correlation — via yfinance |
+| `finance-market-analysis` | `himself65/finance-skills` | DCF/relative/SOTP valuation, earnings preview/recap, ETF premium-discount, correlation, SEPA/Minervini trend-template screening — via yfinance |
 | `financial-analysis` | `claude-for-financial-services` | Core DCF/comps/LBO/3-statement modeling primitives (foundation for the verticals below) |
 | `equity-research` | `claude-for-financial-services` | `/comps`, `/earnings`, initiating-coverage workflows |
 | `wealth-management` | `claude-for-financial-services` | Client reviews, portfolio analysis, client reporting |
@@ -194,6 +194,7 @@ Installed globally (user scope, all Claude Code sessions — not project config,
 These are a **supplement** to the `prompts/` workflow, not a replacement — `prompts/*.md` stay static/untouched. Most of the concrete use cases below (`PE_5Y_AVERAGES` refresh, `WATCHLIST` catalyst resolution) apply to **`config/settings_satellite.py`**, since that's where those fields live post-split:
 - Refreshing `PE_5Y_AVERAGES` (quarterly, in `settings_satellite.py`) — `finance-market-analysis`'s DCF/relative/SOTP triangulation beats scraping Macrotrends by hand
 - Resolving `WATCHLIST` catalyst items (in `settings_satellite.py`) — `equity-research`'s `/earnings` and comps workflows
+- Checking a watchlist ticker's technical setup — `finance-market-analysis:sepa-strategy` (Minervini trend-template/stage/RS/base-pattern). Paste results into that ticker's `WATCHLIST[key]['sepa']` dict (`stage`, `rs_pct`, `pattern`, `checked_date`) in `settings_satellite.py`, not the free-text `note` — the Watchlist sheet renders `sepa` as its own columns (Excel truncates `note` to 200 chars, SEPA detail doesn't survive there)
 - Writing up Stage 2's Portfolio Health Check / Action Recommendations (either book) — `wealth-management`'s client-review and reporting skills map onto that deliverable format
 
 ---

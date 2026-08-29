@@ -411,15 +411,16 @@ def write_watchlist_sheet(wb, settings):
     """Write the WATCHLIST dict to a structured sheet."""
     ws = wb.create_sheet('👀 Watchlist')
 
-    ws.merge_cells('A1:F1')
+    ws.merge_cells('A1:I1')
     ws['A1'] = 'WATCHLIST — Pending Actions & Watch Items'
     ws['A1'].font = TITLE_F
 
-    headers = ['Key', 'Ticker', 'Action', 'Target Price', 'Date', 'Note']
-    _style_header_row(ws, 3, 6, headers)
+    headers = ['Key', 'Ticker', 'Action', 'Target Price', 'Date',
+               'SEPA Stage', 'SEPA RS%', 'SEPA Pattern', 'Note']
+    _style_header_row(ws, 3, 9, headers)
 
     from openpyxl.utils import get_column_letter
-    for i, w in enumerate([18, 8, 14, 13, 12, 60], 1):
+    for i, w in enumerate([18, 8, 14, 13, 12, 11, 10, 22, 60], 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     for idx, (key, entry) in enumerate(settings.WATCHLIST.items()):
@@ -444,10 +445,20 @@ def write_watchlist_sheet(wb, settings):
                     or entry.get('catalyst_date') or '—')
         ws.cell(row=r, column=5, value=date_val)
 
-        note = entry.get('note', '')
-        ws.cell(row=r, column=6, value=note[:200] if note else '').alignment = Alignment(wrap_text=True)
+        sepa = entry.get('sepa', {})
+        ws.cell(row=r, column=6, value=sepa.get('stage', '—'))
+        rs_pct = sepa.get('rs_pct')  # stored as raw percent, e.g. 36.5 = 36.5%
+        if rs_pct is not None:
+            c = ws.cell(row=r, column=7, value=rs_pct / 100)
+            c.number_format = '+0.0%;-0.0%'
+        else:
+            ws.cell(row=r, column=7, value='—')
+        ws.cell(row=r, column=8, value=sepa.get('pattern', '—'))
 
-        for c in range(1, 7):
+        note = entry.get('note', '')
+        ws.cell(row=r, column=9, value=note[:200] if note else '').alignment = Alignment(wrap_text=True)
+
+        for c in range(1, 10):
             ws.cell(row=r, column=c).border = THIN_BORDER
 
     ws.freeze_panes = 'A4'

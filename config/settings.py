@@ -100,31 +100,31 @@ SIGNAL_RULES = {
 # Satellite-specific fields (satellite_overrides) live in
 # config/settings_satellite.py now, not here.
 MACRO_REGIME = {
-    'as_of_date': '2026-07-28',
+    'as_of_date': '2026-08-29',
     'quadrant': 'D',
-    'regime_label': 'Stagflation / Hike-Risk Elevated — Hormuz Ceasefire-Pause Fraying the Oil-Shock Narrative',
-    'confidence': 'high',   # Underlying inflation (MAS tightening, still-rising hike odds) still confirms D; the new fact this cycle is a de-escalation, not a reversal
-    'fed_funds_rate': '3.50–3.75% (held since Dec 2025 cut); Jul 29 FOMC decision tomorrow',
-    'fed_balance_sheet': '$6.72-6.74T total assets (H.4.1, wk of Jul 22); ~$260-280B below $7T QB trigger; roughly flat (+$4B wk, +$89B YoY)',
-    'pce_headline': 'June print due Jul 30, 2026 (not yet released); Truflation nowcast ~3.7% YoY, flat MoM',
-    'pce_core': 'June print due Jul 30, 2026 (not yet released); Truflation nowcast +0.2% MoM / ~3.3% YoY — still elevated',
+    'regime_label': 'Stagflation / Hike-Risk — Hormuz Closed, Ceasefire Collapsed; Inflation Cooling but Still Elevated',
+    'confidence': 'high',   # High rates confirmed (Jul 29 hold, not cut) + low/declining BS ($6.73T, well under $7T) both hold D; geopolitical leg deteriorated (closure, not pause) while inflation improved — net still D
+    'fed_funds_rate': '3.50–3.75% (held Jul 29 FOMC, 9-3 vote, 3 dissents wanted hike); next meeting Sep 16, 2026',
+    'fed_balance_sheet': '$6.73T total assets (H.4.1, wk of Aug 26); down slightly wk/wk (-$20B) from $6.75T; ~$270B below $7T QB trigger',
+    'pce_headline': '3.7% YoY (June print, released Jul 30) — down from May 4.1%; MoM -0.1%',
+    'pce_core': '3.3% YoY (June print) — down from May 3.4%; MoM +0.1%; still well above 2% target',
     'cpi_latest': '3.5% YoY headline (June print, released Jul 14); prior May print 4.2%/2.9% core',
-    'jobs_may': "June payrolls +57k (vs 115k consensus), well below May's downwardly-revised +129k; unemployment 4.2% (participation fell to 61.5%, lowest since Mar 2021) — soft print despite hot inflation",
-    'yield_curve': '10Y ~4.67% (Jul 25) / 2Y ~4.21% (Jul 10, STALE — re-verify) ≈ +46bp; positive',
-    'vix': '17.57, -5.44% (Jul 28) — falling, unwinding the Jul 23 spike as Hormuz tensions ease',
-    'brent': 'Sharp reversal: spot fell to $82.62 (Jul 27, -8.68% single day) on US-Iran attack pause + Oman-mediated reopening talks; futures still quoting $96-100 range, pricing a lingering risk premium the spot move hasn\'t confirmed — divergence worth watching, not yet resolved',
-    'fedwatch_next_meeting': 'Jul 29 FOMC: 61.3% hold / 38.7% hike probability (Jul 25) — still climbing despite the oil de-escalation (up from 34.7% a week ago, 10.7% two weeks ago); looks like a lagging reaction to the pre-ceasefire inflation data, not yet reflecting Jul 26-27 news',
-    'fedwatch_dec_cumulative': 'No fresh read this cycle — carry-forward ~78.2% no-change / ~15.4% cut / ~5.4% hike cumulative to Dec 2026 is now STALE, re-verify next cycle',
-    'hormuz_status': 'CEASEFIRE-PAUSE (Jul 26) — US and Iran paused attacks after the Jul 11-23 escalation; Oman-mediated talks resumed on reopening. Traffic still far below normal (24-vessel backlog at Kharg Island as of Jul 26-27). First de-escalation signal since the closure, but durability unconfirmed — the prior Jun 17 agreement collapsed within weeks, so treat this as fragile, not resolved.',
-    'tariff_section_122': 'Statutory Section 122 duties expired Jul 24 as scheduled; Federal Circuit appeal on the merits still pending (stay granted Jun 11), no ruling yet — unresolved',
-    'mas_stance': 'RESOLVED Jul 27: 2nd consecutive quarter of SGD-appreciation-slope tightening (smaller step than April); Q2 core inflation 1.5% YoY (up from 1.2% pre-conflict); Q2 GDP +5.7% YoY (beat); inflation seen elevated into early 2027',
+    'jobs_may': "June payrolls +57k (vs 115k consensus), well below May's downwardly-revised +129k; unemployment 4.2% (participation fell to 61.5%, lowest since Mar 2021) — soft print despite hot inflation; weak July print (per Aug 7 reporting) further deflated Fed hike odds",
+    'yield_curve': '10Y 4.68% / 2Y 4.24% (Aug 27) ≈ +44bp; positive, roughly stable',
+    'vix': '14.57 (Aug 29) — 2026 low, falling further from Jul 28\'s 17.57; no breach 25/35, market pricing calm despite active Hormuz conflict',
+    'brent': 'Sharp decline: $87.46 (Aug 27, intraday +1.97% to $89.13) down from $95.29 (Aug 21) and $94.12 (Aug 24) — war premium unwinding through the month even as the strait itself remains closed, a notable divergence between spot price and ground conflict',
+    'fedwatch_next_meeting': 'Sep 16 FOMC: readings diverging hard across sources as of Aug 25-28 — CME FedWatch as low as 45.1% hold / ~30% hike, other trackers 58-60% hold, prediction markets ~51% hold; a "hike now expected" narrative (Chase/Goldman coverage) has emerged citing energy-shock inflation pass-through, in tension with the weak-jobs-driven hold case from a week prior — no consensus reading exists this cycle',
+    'fedwatch_dec_cumulative': 'No clean read this cycle — conflicting signals: fed funds futures broadly price a year-end hike lean (~4%) per some sources, while Sep-specific odds favor hold post jobs-miss; genuinely mixed, re-verify next cycle',
+    'hormuz_status': 'CLOSED/CONTESTED but with a live diplomatic track — Iran established a "Persian Gulf Strait Authority" (May) requiring passage permits, periodic attacks/US retaliation disrupted traffic for ~5 months; conflict abated in early Aug amid Iran-Oman talks, with Iran-Oman now floating a temporary shipping-corridor proposal and Qatar\'s PM visiting Tehran to mediate a return to pre-Feb-28 status quo; simultaneously Iran is warning of ship seizures ahead of a Bessent-led US sanctions push and pushing back on Trump\'s "economic D-Day" threat — de-escalation talks and fresh threats running in parallel, unresolved',
+    'tariff_section_122': 'Federal Circuit administrative stay (issued May 12) still in force "until further notice"; no ruling found on the stay-pending-appeal motion as of late Aug — unresolved, unchanged since Jul 28',
+    'mas_stance': 'Unchanged since Jul 27 statement (2nd consecutive tightening step, smaller than April; S$NEER holding upper half of band); next quarterly statement due ~Oct 2026',
     'open_inflections': [
-        'Hormuz ceasefire-pause (Jul 26) — durability unconfirmed, watch for re-escalation (prior Jun 17 truce collapsed within weeks) or a genuine reopening',
-        'Jul 29 FOMC — 38.7% hike probability, highest of this cycle, still rising despite the oil de-escalation (lagging reaction, needs next reading to confirm/deny)',
-        'June PCE due Jul 30 — will confirm/deny Truflation nowcast (3.7% headline / 3.3% core)',
-        'Section 122 tariff appeal still unresolved at Federal Circuit post-expiry',
-        '2Y yield reading is stale (Jul 10) — re-verify before trusting the curve reading next cycle',
-        'Fed BS vs $7T + Dec cut prob vs 30% — Quadrant B rotation trigger, still far (~$260-280B / cut-prob reading itself stale)',
+        'Hormuz: Iran-Oman shipping-corridor proposal + Qatar mediation vs. Iran ship-seizure warnings/Bessent sanctions push — watch which track wins next',
+        'Iran-Israel-US ceasefire lapsed mid-Aug; Israel struck Lebanon Aug 16; Kushner regional diplomacy ongoing but no Iran breakthrough',
+        'VIX at 2026 low (14.57) despite active Hormuz conflict — complacency/divergence risk, could reprice sharply on any escalation headline',
+        'Sep 16 FOMC — no consensus read (45-60% hold across sources); a hike-now-expected narrative has emerged, contradicting last week\'s jobs-miss-driven hold case',
+        'Dec 2026 rate path genuinely unclear — hike-lean futures pricing vs jobs-miss-driven hold odds conflict, needs a clean re-read next cycle',
+        'Section 122 tariff Federal Circuit stay unresolved since May — appeal outcome still pending',
     ],
     'quadrant_b_distance': 'far',
 }
@@ -172,7 +172,7 @@ NAV_HISTORY_PATH = 'output/nav_history_core.json'
 # ============================================================
 # SNAPSHOT DATE
 # ============================================================
-SNAPSHOT_DATE = '2026-07-24'
+SNAPSHOT_DATE = '2026-08-29'
 
 # ============================================================
 # DATA FRESHNESS METADATA
@@ -187,7 +187,7 @@ DATA_FRESHNESS = {
         'update_action': 'Run main.py (any mode); bump SNAPSHOT_DATE to today',
     },
     'macro_regime': {
-        'value':         '2026-07-28',
+        'value':         '2026-08-29',
         'cadence_days':  7,
         'label':         'Macro regime block',
         'update_action': 'Update MACRO_REGIME dict + open_inflections in settings.py; bump value here',
