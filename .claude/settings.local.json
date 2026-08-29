@@ -11,7 +11,10 @@
       "Bash(python main.py --yf-only)",
       "Bash(echo \"EXIT_CODE=$?\")",
       "PowerShell(python main.py --yf-only 2>&1 | Out-String; Write-Output \"EXIT=$LASTEXITCODE\")",
-      "WebSearch"
+      "WebSearch",
+      "PowerShell(git add CLAUDE.md config/settings.py config/settings_satellite.py modules/load.py)",
+      "PowerShell(git add .claude/settings.local.json)",
+      "PowerShell(git commit -m \"chore: allow git add permission for settings edits\")"
     ]
   }
 }
