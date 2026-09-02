@@ -6,6 +6,9 @@ USAGE:
   python main.py --satellite      → Satellite/risk book instead (config/settings_satellite.py)
   python main.py --yf-only        → Offline shares + yfinance prices (no Tiger needed)
   python main.py --offline        → Manual snapshot data, no API calls
+  python main.py --ibkr           → Hybrid mode via IBKR instead of Tiger (draft, see
+                                     modules/extract_ibkr.py — requires TWS/IB Gateway running
+                                     locally + ib_insync installed; ignored with --yf-only/--offline)
   (flags combine, e.g. python main.py --satellite --offline)
 
 Both books share every module in modules/ — they only differ in which
@@ -110,9 +113,10 @@ def _append_nav_history(summary, settings):
     logger.info(f"  NAV history: {len(history)} day(s) tracked → {path}")
 
 
-def run_pipeline(mode='hybrid'):
+def run_pipeline(mode='hybrid', broker='tiger'):
     logger.info("=" * 60)
-    logger.info(f"PORTFOLIO PIPELINE — Book: {PORTFOLIO.upper()} | Mode: {mode.upper()}")
+    logger.info(f"PORTFOLIO PIPELINE — Book: {PORTFOLIO.upper()} | Mode: {mode.upper()}"
+                + (f" | Broker: {broker.upper()}" if mode == 'hybrid' else ""))
     logger.info("=" * 60)
 
     # STAGE 0: AUDIT — freshness checks before we trust anything downstream
@@ -121,7 +125,11 @@ def run_pipeline(mode='hybrid'):
     # STAGE 1: EXTRACT
     logger.info("STAGE 1: Extracting data...")
     if mode == 'hybrid':
-        raw_data = extract_hybrid(settings)
+        if broker == 'ibkr':
+            from modules.extract_ibkr import extract_ibkr_hybrid  # lazy import — ib_insync optional dependency
+            raw_data = extract_ibkr_hybrid(settings)
+        else:
+            raw_data = extract_hybrid(settings)
     elif mode == 'yf-only':
         raw_data = extract_yf_only(settings)
     else:
@@ -210,4 +218,5 @@ if __name__ == '__main__':
         mode = 'yf-only'
     else:
         mode = 'hybrid'
-    run_pipeline(mode=mode)
+    broker = 'ibkr' if '--ibkr' in args else 'tiger'
+    run_pipeline(mode=mode, broker=broker)
