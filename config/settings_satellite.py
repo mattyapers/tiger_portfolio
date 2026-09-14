@@ -137,30 +137,30 @@ PE_5Y_AVERAGES = {
 # REGIME_PLAYBOOK below are what actually differ, since only this book
 # has satellite positions to tilt.
 MACRO_REGIME = {
-    'as_of_date': '2026-08-29',
+    'as_of_date': '2026-09-14',
     'quadrant': 'D',
-    'regime_label': 'Stagflation / Hike-Risk — Hormuz Closed, Ceasefire Collapsed; Inflation Cooling but Still Elevated',
-    'confidence': 'high',   # High rates confirmed (Jul 29 hold, not cut) + low/declining BS ($6.73T, well under $7T) both hold D; geopolitical leg deteriorated (closure, not pause) while inflation improved — net still D
-    'fed_funds_rate': '3.50–3.75% (held Jul 29 FOMC, 9-3 vote, 3 dissents wanted hike); next meeting Sep 16, 2026',
-    'fed_balance_sheet': '$6.73T total assets (H.4.1, wk of Aug 26); +0.3% YoY, essentially flat — not expanding; ~$270B below $7T QB trigger',
-    'pce_headline': '3.7% YoY (June print, released Jul 30) — down from May 4.1%; MoM -0.1%',
-    'pce_core': '3.3% YoY (June print) — down from May 3.4%; MoM +0.1%; still well above 2% target',
-    'cpi_latest': '3.5% YoY headline (June print, released Jul 14); prior May print 4.2%/2.9% core',
-    'jobs_may': "June payrolls +57k (vs 115k consensus), well below May's downwardly-revised +129k; unemployment 4.2% (participation fell to 61.5%, lowest since Mar 2021) — soft print despite hot inflation; weak July print (per Aug 7 reporting) further deflated Fed hike odds",
-    'yield_curve': '10Y 4.68% / 2Y 4.24% (Aug 27) ≈ +44bp; positive, roughly stable',
-    'vix': '14.57 (Aug 29) — 2026 low, falling further from Jul 28\'s 17.57; no breach 25/35, market pricing calm despite active Hormuz conflict',
-    'brent': 'Sharp decline: $87.46 (Aug 27, intraday +1.97% to $89.13) down from $95.29 (Aug 21) and $94.12 (Aug 24) — war premium unwinding through the month even as the strait itself remains closed, a notable divergence between spot price and ground conflict',
-    'fedwatch_next_meeting': 'Sep 16 FOMC: consensus has firmed back to hold — CME FedWatch ~67.6% hold / ~32% hike (Aug 29), up from the split 45-60% range a few days prior; the 3 hawkish Jul 29 dissents haven\'t moved the market off a hold-base-case',
-    'fedwatch_dec_cumulative': 'Still genuinely split — some sources read fed funds futures as pricing ~4% by year-end (hike lean), while a separate survey has 55-65% of participants expecting one more cut to 3.25-3.50% and 30-40% expecting no cut; treat as unresolved, doesn\'t change the BS-driven B-trigger read either way',
-    'hormuz_status': 'CLOSED/CONTESTED but with a live diplomatic track — Iran established a "Persian Gulf Strait Authority" (May) requiring passage permits, periodic attacks/US retaliation disrupted traffic for ~5 months; conflict abated in early Aug amid Iran-Oman talks, with Iran-Oman now floating a temporary shipping-corridor proposal and Qatar\'s PM visiting Tehran to mediate a return to pre-Feb-28 status quo; simultaneously Iran is warning of ship seizures ahead of a Bessent-led US sanctions push and pushing back on Trump\'s "economic D-Day" threat — de-escalation talks and fresh threats running in parallel, unresolved',
-    'tariff_section_122': 'Federal Circuit administrative stay (issued May 12) still in force "until further notice"; no ruling found on the stay-pending-appeal motion as of late Aug — unresolved, unchanged since Jul 28',
-    'mas_stance': 'Unchanged since Jul 27 statement (2nd consecutive tightening step, smaller than April; S$NEER holding upper half of band); next quarterly statement due ~Oct 2026',
+    'regime_label': 'Stagflation / Hike-Risk — Hormuz Escalating (Vessel Struck), Ceasefire Dead; Inflation Improving but Rate Path Hawkish',
+    'confidence': 'high',   # BS flat ~$6.7T well under $7T holds D; rate-path risk flipped from cut-lean to hike-lean (Warsh Jackson Hole) pushes further from B, not toward it; Hormuz escalation (vessel struck Sep 13) reinforces stagflation leg via Brent spike
+    'fed_funds_rate': '3.50–3.75% (held since Jul 29 FOMC); Sep 16, 2026 FOMC decision pending — this read predates the outcome',
+    'fed_balance_sheet': '$6.70T total assets (H.4.1, wk of Sep 2); +$6B w/w, +$135B YoY — flat, not expanding; ~$300B below $7T QB trigger',
+    'pce_headline': '3.7% YoY (Jul print, released Aug 26) — latest available; Aug print due Sep 30',
+    'pce_core': '3.3% YoY (Jul print) — latest available; Aug CPI (Sep 11) improved to 3.35% headline / 2.45% core YoY, a positive lead into Sep 30 PCE',
+    'cpi_latest': '3.35% YoY headline / 2.45% core (Aug print, released Sep 11) — improved from Jul\'s 3.5%/3.3% PCE-adjacent reads',
+    'jobs_may': "No new print sourced this cycle; carried from last cycle — June payrolls +57k (vs 115k consensus), unemployment 4.2%; weak July print (per Aug 7 reporting) had deflated hike odds, since reversed by Warsh's hawkish Jackson Hole speech",
+    'yield_curve': '10Y 4.96% / 2Y 4.63% (Sep 11) ≈ +33bp; positive but narrower than Aug 27\'s +44bp — both legs shifted up ~30bp',
+    'vix': '16.34 (mid-Sep) — up from Aug 29\'s 14.57 2026-low but still in normal 15-25 band; no breach 25/35',
+    'brent': 'Sharp reversal higher: ~$102-104 (Sep 12-14), up from $87.46 (Aug 27) — renewed U.S.-Iran tit-for-tat strikes reignited war premium; opposite direction from last cycle\'s unwind',
+    'fedwatch_next_meeting': 'Sep 16 FOMC: hike-risk surged — Aug 31 CME read ~66% hike, a sharp reversal from Aug 29\'s 67.6% hold-lean, driven by Warsh\'s hawkish Jackson Hole speech; live/unresolved into the decision',
+    'fedwatch_dec_cumulative': 'CME FedWatch (Sep read): ~78.2% hold / 15.4% cut / 5.4% hike through Dec — calmer than the Sep meeting read implies; Sep hike-risk currently looks front-loaded rather than sustained into Dec, an internal inconsistency worth re-checking once the Sep 16 outcome lands',
+    'hormuz_status': 'CLOSED, Day 197, traffic ~90% below pre-conflict (5-11 ships/day vs ~125 normal) — escalated since last cycle: Iran reports a commercial vessel struck near Qeshm (Sep 13), and the planned Gulf-Iran talks on Oman\'s reopening plan were postponed indefinitely the same day. Reverses last cycle\'s cautious de-escalation read',
+    'tariff_section_122': 'Unchanged — Federal Circuit administrative stay (issued May 12) still in force pending appeal; no ruling found as of Sep 14, now stale since May',
+    'mas_stance': 'Unchanged since Jul 27 statement (S$NEER upper half of appreciating band); next quarterly statement due ~Oct 2026',
     'open_inflections': [
-        'Hormuz: Iran-Oman shipping-corridor proposal + Qatar mediation vs. Iran ship-seizure warnings/Bessent sanctions push — watch which track wins next',
-        'Iran-Israel-US ceasefire lapsed mid-Aug; Israel struck Lebanon Aug 16; Kushner regional diplomacy ongoing but no Iran breakthrough',
-        'VIX at 2026 low (14.57) despite active Hormuz conflict — complacency/divergence risk, could reprice sharply on any escalation headline',
-        'Sep 16 FOMC — consensus back to hold (~67.6%, CME FedWatch Aug 29), but 3 hawkish Jul 29 dissents + murky Dec path mean this could swing again',
-        'Dec 2026 rate path genuinely unclear — hike-lean futures pricing vs jobs-miss-driven hold odds conflict, needs a clean re-read next cycle',
+        'Sep 16 FOMC decision — live, hike-risk surged since Aug 29 (Warsh Jackson Hole speech); outcome will force a regime re-read next cycle regardless of direction',
+        'Hormuz escalation: vessel struck Sep 13 + Gulf-Iran talks postponed same day — track reversed from de-escalation to escalation since last cycle',
+        'Brent +17% in ~3 weeks ($87→$102) — war premium back in full; watch pass-through into next PCE/CPI prints',
+        'Iran-Israel-US: no ceasefire in force, Trump warning harsher retaliation if Iran strikes again — situation hardened, not softened, since Aug',
+        'Aug PCE release Sep 30 — first read testing whether Aug CPI\'s improvement (3.35%/2.45%) carries through to the Fed\'s preferred gauge',
         'Section 122 tariff Federal Circuit stay unresolved since May — appeal outcome still pending',
     ],
     'quadrant_b_distance': 'far',
@@ -206,7 +206,7 @@ NAV_HISTORY_PATH = 'output/nav_history_satellite.json'
 # ============================================================
 # SNAPSHOT DATE
 # ============================================================
-SNAPSHOT_DATE = '2026-08-29'
+SNAPSHOT_DATE = '2026-09-14'
 
 # ============================================================
 # DATA FRESHNESS METADATA
@@ -219,7 +219,7 @@ DATA_FRESHNESS = {
         'update_action': 'Run main.py --satellite (any extract mode); bump SNAPSHOT_DATE to today',
     },
     'macro_regime': {
-        'value':         '2026-08-29',
+        'value':         '2026-09-14',
         'cadence_days':  7,
         'label':         'Macro regime block',
         'update_action': 'Update MACRO_REGIME dict + open_inflections in settings_satellite.py; bump value here',
@@ -237,7 +237,7 @@ DATA_FRESHNESS = {
         'update_action': 'Review SATELLITE_TARGETS for post-trade changes; bump value here',
     },
     'watchlist': {
-        'value':         '2026-08-29',
+        'value':         '2026-09-14',
         'cadence_days':  14,
         'label':         'Watchlist pending actions',
         'update_action': 'Resolve or extend each WATCHLIST entry; bump value here',
