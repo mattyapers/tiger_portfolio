@@ -1,11 +1,17 @@
 """
 audit.py — Pre-flight checks for data staleness and price drift.
 
-Two responsibilities:
-  1. validate_freshness()    — date arithmetic on settings.DATA_FRESHNESS
-  2. price_sanity_check()    — compares snapshot prices to live yfinance spot
+Three responsibilities:
+  1. validate_freshness()      — date arithmetic on settings.DATA_FRESHNESS
+  2. price_sanity_check()      — compares snapshot prices to live yfinance spot
+  3. check_unmapped_tickers()  — flags Tiger positions mapped into NEITHER
+                                 book's TICKER_TIERS (the D05.SI/MRVL bug,
+                                 2026-11-09: a new Tiger buy silently vanishes
+                                 from both books' totals until someone
+                                 notices by hand)
 
-Both are surfaced to the weekly review via the Audit sheet in portfolio_tracker.xlsx.
+All three are surfaced to the weekly review via the Audit sheet in
+portfolio_tracker.xlsx / satellite_tracker.xlsx.
 """
 
 from datetime import datetime
@@ -130,3 +136,42 @@ def price_sanity_check(holdings_df, tolerance=0.10, yf_symbol_map=None):
         logger.info(f"✅ Price sanity check: all positions within {tolerance:.0%} of spot")
 
     return flagged
+
+
+def check_unmapped_tickers(positions_df):
+    """
+    Flag any live Tiger position not mapped into EITHER book's TICKER_TIERS.
+
+    classify_tiers() (modules/transform.py) silently drops a position not in
+    THIS book's TICKER_TIERS as "Unknown" — by design, so Core/Core-Plus and
+    Satellite don't double-count each other's holdings. But a ticker missing
+    from BOTH books means it's a real Tiger position nobody is tracking at
+    all: it never shows in Excel, the dashboard, or either book's totals,
+    and nothing used to flag that (see D05.SI/MRVL, discovered 2026-11-09
+    only because the user noticed the dollar total looked low).
+
+    Imports both settings modules directly rather than taking them as a
+    param, so this can run from either book's main.py without threading
+    the other book's settings through run_pipeline().
+
+    Returns: list[str] of unmapped symbols, sorted. Empty list if none.
+    """
+    if positions_df is None or positions_df.empty or 'symbol' not in positions_df.columns:
+        return []
+
+    from config import settings as core_settings
+    from config import settings_satellite as satellite_settings
+
+    known = set(core_settings.TICKER_TIERS) | set(satellite_settings.TICKER_TIERS)
+    held = set(positions_df['symbol'].dropna())
+    unmapped = sorted(held - known)
+
+    if unmapped:
+        logger.warning(f"🚨 {len(unmapped)} ticker(s) held on Tiger but mapped in NEITHER book: {unmapped}")
+        logger.warning("   Silently excluded from both books' totals/dashboards. Add to the "
+                        "appropriate book's TICKER_TIERS (settings_satellite.py for a new "
+                        "discretionary buy; settings.py for a new Core/Core-Plus index fund).")
+    else:
+        logger.info("✅ All held tickers mapped to a book")
+
+    return unmapped

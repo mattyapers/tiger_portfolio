@@ -81,7 +81,7 @@ else:
 from modules.extract import extract_hybrid, extract_yf_only, extract_offline
 from modules.transform import transform_all
 from modules.load import load_to_excel
-from modules.audit import validate_freshness, price_sanity_check
+from modules.audit import validate_freshness, price_sanity_check, check_unmapped_tickers
 from modules.screener import run_screener
 from modules.dashboard import generate_html_dashboard
 
@@ -156,6 +156,14 @@ def run_pipeline(mode='hybrid', broker='tiger'):
     logger.info(f"  Positions: {len(raw_data['positions'])}")
     logger.info(f"  Account equity: ${raw_data['account']['total_equity']:,.2f}")
 
+    # Unmapped-ticker check — catches a new Tiger buy that isn't in EITHER
+    # book's TICKER_TIERS yet (silently excluded from both books' totals
+    # otherwise; see D05.SI/MRVL, 2026-11-09). Runs every mode that has
+    # real positions to check, not just offline.
+    unmapped_tickers = check_unmapped_tickers(raw_data['positions'])
+    if unmapped_tickers:
+        is_clean = False
+
     # Price drift check — only meaningful in offline mode (other modes just refreshed prices)
     price_drift = []
     if mode == 'offline':
@@ -168,6 +176,7 @@ def run_pipeline(mode='hybrid', broker='tiger'):
     analytics['audit'] = {
         'freshness': freshness_report,
         'price_drift': price_drift,
+        'unmapped_tickers': unmapped_tickers,
         'is_clean': is_clean,
     }
 

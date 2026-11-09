@@ -329,28 +329,24 @@ WATCHLIST = {
     # Watchlist Review. Screener confirms regime-fit ⚠️ (quality compounder, not
     # a stagflation/Quadrant D hedge) and no pullback ever materialized —
     # forced verdict: CLOSE, don't keep chasing a weak regime match.
-    'DBS': {
-        'ticker': 'D05.SI',   # bare 'DBS' resolves to Invesco DB Silver Fund on Yahoo/yfinance, wrong instrument
-        'target_price': None,
-        'note': 'Singapore bank — SGD base, ASEAN growth. Price quoted in SGD (SGX-listed), not USD like the rest of the watchlist.',
-    },
+    # DBS (D05.SI) CLOSED 2026-11-09 — was already a held position (3 shares)
+    # that had no TICKER_TIERS entry, so it sat on the watchlist as a "should
+    # we buy this" candidate while silently excluded from both books' totals.
+    # Resolved: added to TICKER_TIERS/SATELLITE_TARGETS/TICKER_CURRENCY above
+    # instead — it's a current holding, not a watch candidate.
     'COPX': {
         'ticker': 'COPX',
         'target_price': None,
         'note': 'Copper miners — critical minerals theme',
     },
-    'MRVL': {
-        'ticker': 'MRVL',
-        'target_price': None,
-        'note': (
-            'Custom silicon / data center / AI infrastructure. Similar regime profile to NVDA — '
-            'not a Quadrant D fit (high multiple, growth, no FCF cushion). Hold on watchlist for '
-            'a regime shift toward B (Fed BS > $7T + cut prob > 30%) or for a major valuation reset. '
-            'NOTE: 1 share of MRVL is already held in the Tiger account (cost $300.345) but is not in '
-            'TICKER_TIERS here or in config/settings.py — it is currently invisible to both books\' '
-            'totals post-split. Either add it to TICKER_TIERS/SATELLITE_TARGETS here, or track it manually.'
-        ),
-    },
+    # MRVL CLOSED 2026-11-09 — was already a held position (1 share, cost
+    # $300.345) that had no TICKER_TIERS entry, so it sat on the watchlist
+    # as a "should we buy this" candidate while silently excluded from both
+    # books' totals. Resolved: added to TICKER_TIERS/SATELLITE_TARGETS
+    # above instead — it's a current holding, not a watch candidate. The
+    # regime-fit caution (Quadrant D misfit: high multiple, no FCF cushion,
+    # similar profile to NVDA) still applies — see WATCHLIST_REGIME_FIT['MRVL']
+    # for the entry/exit thesis now that it's a held position.
     'WPM': {
         'ticker': 'WPM',
         'target_price': None,

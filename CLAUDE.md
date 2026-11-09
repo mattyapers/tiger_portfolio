@@ -84,7 +84,8 @@ Python 3.9+. Credentials in `config/`: `tiger_private_key.pem` (RSA private key)
 
 Sequential stages called by `main.py`:
 
-1. **Extract** (`modules/extract.py`) — `extract_hybrid()` authenticates with Tiger (RSA-signed), fetches positions, overlays live prices + P/E from yfinance. Auto-fixes fractional share inflation (`real_shares = tiger_market_value / yf_price`). `extract_yf_only()` uses snapshot/hardcoded shares + yfinance. `extract_offline()` loads `settings.SNAPSHOT_PATH`, falls back to `_extract_hardcoded()`. Saves snapshot to `settings.SNAPSHOT_PATH` (differs per book).
+1. **Extract** (`modules/extract.py`) — `extract_hybrid()` authenticates with Tiger (RSA-signed), fetches positions, overlays live prices + P/E from yfinance. Auto-fixes fractional share inflation (`real_shares = tiger_market_value / yf_price`). Converts non-USD-listed positions to USD via `TICKER_CURRENCY` (settings_satellite.py) before any other math touches price/cost — e.g. `D05.SI` reports in SGD. `extract_yf_only()` uses snapshot/hardcoded shares + yfinance. `extract_offline()` loads `settings.SNAPSHOT_PATH`, falls back to `_extract_hardcoded()`. Saves snapshot to `settings.SNAPSHOT_PATH` (differs per book).
+1b. **Unmapped-ticker check** (`modules/audit.py`'s `check_unmapped_tickers()`, called from `main.py` right after Extract, every mode) — compares the live Tiger position list against the UNION of both books' `TICKER_TIERS`. Any symbol in neither book is flagged (log WARNING + `is_clean=False` + a dedicated section on the Audit sheet) instead of silently vanishing from both books' totals, which is what happened with `D05.SI`/`MRVL` on 2026-11-09 before this check existed — a real Tiger position with zero representation anywhere in the pipeline, caught only because the user noticed the dollar total looked low. See [Adding a New Ticker](#adding-a-new-ticker) for the fix once a new symbol is flagged.
 2. **Transform** (`modules/transform.py`) — Pure data. Produces tier classification (`Core` / `Core-Bond` / `Core-Plus` in the default book; `Satellite` in the `--satellite` book — the two never coexist since each book's `TICKER_TIERS` only contains its own tickers), weights + drift vs targets, rebalance signals (`TRIM` / `ADD` / `HOLD` at 3% threshold — dormant in the Core/Core-Plus book, no Satellite tier there), macro-regime playbook signals, P/E entry/exit scores (1-5, also dormant in the Core/Core-Plus book). `classify_tiers()` drops any position not in the active book's `TICKER_TIERS` (tier `Unknown`) before totals are computed — this is what lets both books share one Tiger account without double-counting each other's holdings.
 2b. **Screener** (`modules/screener.py`) — `run_screener()` extracts unique tickers from `WATCHLIST`, fetches live yfinance data (price, trailing P/E, forward P/E, FCF yield), computes P/E premium vs `PE_5Y_AVERAGES`, scores each ticker against `WATCHLIST_REGIME_FIT` for Quadrant D fit. Skipped in `--offline` mode; returns empty DataFrame in the Core/Core-Plus book regardless (`WATCHLIST = {}` there).
 3. **Load** (`modules/load.py`) — `openpyxl`. Seven sheets: Dashboard, Holdings, Rebalance Signals, Entry Signals, Audit, Watchlist, Screener. Blue = editable inputs; black = Excel formulas; yellow = flags.
@@ -227,10 +228,15 @@ These are a **supplement** to the `prompts/` workflow, not a replacement — `pr
 
 ## Adding a New Ticker
 
-For Core/Core-Plus/Core-Bond, edit `config/settings.py`. For a new active/satellite position, edit `config/settings_satellite.py` instead — same steps, different file, plus `SATELLITE_TARGETS`/`PE_5Y_AVERAGES` entries.
+**Automatic detection:** every pipeline run (`main.py`, any mode) checks live Tiger positions against the union of both books' `TICKER_TIERS` (`modules/audit.py`'s `check_unmapped_tickers()`) and flags anything untracked — a WARNING in the log, `is_clean=False`, and an "UNMAPPED TICKERS" section on the Excel Audit sheet. A brand-new Tiger buy (from a manual trade, a dividend reinvestment into a new symbol, etc.) gets caught here instead of silently disappearing from both books' totals. Treat a non-empty "Unmapped Tickers" flag the same as a stale `DATA_FRESHNESS` item — resolve it before trusting that run's numbers.
+
+**To resolve a flagged ticker** (or to add one proactively before buying it): for Core/Core-Plus/Core-Bond, edit `config/settings.py`. For a new active/satellite position, edit `config/settings_satellite.py` instead — same steps, different file, plus `SATELLITE_TARGETS`/`PE_5Y_AVERAGES` entries.
 
 1. Add to `TICKER_TIERS` in the relevant settings module (`Core` / `Core-Bond` / `Core-Plus` in `settings.py`; `Satellite` in `settings_satellite.py`)
-2. Add display name to `name_map` in @modules/load.py (shared by both books)
+2. If new to `settings_satellite.py`: also add a `SATELLITE_TARGETS` weight (small/placeholder is fine — it doesn't have to rescale every other target, see the `0.95 < sum < 1.10` tolerance on that dict) and, if a P/E thesis applies, a `PE_5Y_AVERAGES` entry
+3. If the ticker isn't USD-denominated (e.g. an SGX-listed stock like `D05.SI`), add it to `TICKER_CURRENCY` in `settings_satellite.py` — otherwise its USD-denominated totals will be wrong by whatever the FX gap is, not just missing
+4. Add display name to `name_map` in @modules/load.py (shared by both books)
+5. Re-run the pipeline (any mode) and confirm the "Unmapped Tickers" Audit section is clear
 
 ---
 
@@ -258,6 +264,8 @@ Expected outputs (`--satellite`): `output/satellite_tracker.xlsx`, `output/satel
 | Excel `#REF!` | Ticker removed from `TICKER_TIERS` but still referenced; clean mapping in the relevant settings module. |
 | Dashboard missing data | Ensure the book's snapshot file exists (`SNAPSHOT_PATH`); regenerate if needed. |
 | A satellite ticker shows up in the Core/Core-Plus book (or vice versa) | Check `TICKER_TIERS` in both settings modules for an accidental duplicate — should always be disjoint. |
+| Portfolio total looks low / a known holding is missing from both books | Check the Audit sheet's "Unmapped Tickers" section (or the log for `🚨 N ticker(s) held on Tiger but mapped in NEITHER book`) — a real Tiger position with no `TICKER_TIERS` entry anywhere is silently excluded from both books' totals. See [Adding a New Ticker](#adding-a-new-ticker). |
+| A non-USD ticker's dollar value looks ~20-40% off | It's probably not in `TICKER_CURRENCY` (settings_satellite.py) — Tiger/yfinance report price and avg_cost in the LISTING currency (e.g. SGD for SGX stocks), not USD, unless converted. |
 | IBKR positions look stale/wrong | `--multi-broker-manual` reads `IBKR_MANUAL_POSITIONS` by hand — re-check the IBKR app and update that dict + `DATA_FRESHNESS['ibkr_manual_positions']`; it will never auto-refresh (IBKR Lite has no API). |
 | `--ibkr`/`--multi-broker` hang or fail to connect | Expected on IBKR Lite — no TWS/API access at that tier. Use `--multi-broker-manual` instead, or upgrade to IBKR Pro. |
 

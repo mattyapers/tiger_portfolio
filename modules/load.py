@@ -404,6 +404,20 @@ def write_audit_sheet(wb, audit):
             for col in range(1, 5):
                 ws.cell(row=row, column=col).border = THIN_BORDER
 
+    # Unmapped tickers section — positions held on Tiger but mapped into
+    # NEITHER book's TICKER_TIERS (silently excluded from both books'
+    # totals otherwise; see modules/audit.py's check_unmapped_tickers()).
+    unmapped = audit.get('unmapped_tickers', [])
+    unmapped_start = drift_start + (2 + len(drift) if drift else 2) + 1
+    ws.cell(row=unmapped_start, column=1, value='UNMAPPED TICKERS (held, not tracked by either book)').font = SECTION_F
+
+    if not unmapped:
+        ws.cell(row=unmapped_start + 1, column=1, value='✅ All held tickers mapped to a book')
+    else:
+        ws.cell(row=unmapped_start + 1, column=1,
+                value=f"🚨 {', '.join(unmapped)} — add to the correct book's TICKER_TIERS (settings_satellite.py for a new discretionary buy, settings.py for a new Core/Core-Plus fund)")
+        ws.cell(row=unmapped_start + 1, column=1).fill = ALERT_BG
+
     return ws
 
 

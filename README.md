@@ -38,10 +38,17 @@ Output: `output/portfolio_tracker.xlsx` + `output/dashboard.html` (Core/Core-Plu
 ```
 main.py (orchestrator)
   │
+  ├─ STAGE 0: audit.py ────── freshness checks (DATA_FRESHNESS)
+  │
   ├─ STAGE 1: extract.py ─── Tiger API (what you OWN)
   │                       └── yfinance  (what it's WORTH)
   │                       └── merge + fix fractional shares
+  │                       └── convert non-USD tickers to USD (TICKER_CURRENCY)
   │                       └── auto-save → output/latest_snapshot.json
+  │                       └── [main.py] unmapped-ticker check: every live
+  │                           Tiger position vs. UNION of both books'
+  │                           TICKER_TIERS — flags anything tracked by
+  │                           neither book (see "Adding a new ticker")
   │
   ├─ STAGE 2: transform.py ─ classify tiers
   │                        ├─ calculate weights + drift
@@ -81,14 +88,17 @@ tiger_portfolio/
 │   ├── transform.py         ← Stage 2: Calculate metrics, generate signals. classify_tiers() drops anything not in the active book's TICKER_TIERS.
 │   ├── screener.py          ← Stage 2b: Fetch + score WATCHLIST tickers (skipped offline).
 │   ├── load.py              ← Stage 3: Write Excel workbook.
-│   ├── dashboard.py         ← Stage 4: Generate HTML portfolio dashboard.
-│   ├── audit.py             ← Data freshness + price-drift checks (written to Audit sheet).
+│   ├── dashboard.py         ← Stage 4: Generate HTML portfolio dashboard (two cross-linked pages — main + Macro Overview).
+│   ├── audit.py             ← Data freshness + price-drift + unmapped-ticker checks (written to Audit sheet). check_unmapped_tickers() flags any live Tiger position missing from BOTH books' TICKER_TIERS.
+│   ├── extract_ibkr.py      ← IBKR integration (manual-entry + live API paths) — see "Broker Routing" in CLAUDE.md.
 │   └── __init__.py
 ├── output/
-│   ├── portfolio_tracker.xlsx    ← Core/Core-Plus Excel report (7 sheets).
-│   ├── satellite_tracker.xlsx    ← Satellite Excel report (`--satellite`), separate file.
-│   ├── dashboard.html            ← Core/Core-Plus HTML dashboard.
-│   ├── satellite_dashboard.html  ← Satellite HTML dashboard (`--satellite`).
+│   ├── portfolio_tracker.xlsx         ← Core/Core-Plus Excel report (7 sheets).
+│   ├── satellite_tracker.xlsx         ← Satellite Excel report (`--satellite`), separate file.
+│   ├── dashboard.html                 ← Core/Core-Plus HTML dashboard (holdings + overview).
+│   ├── dashboard_macro.html           ← Core/Core-Plus Macro Overview page, cross-linked from dashboard.html.
+│   ├── satellite_dashboard.html       ← Satellite HTML dashboard (`--satellite`).
+│   ├── satellite_dashboard_macro.html ← Satellite Macro Overview page.
 │   ├── latest_snapshot.json      ← Core/Core-Plus auto-saved snapshot.
 │   ├── satellite_snapshot.json   ← Satellite auto-saved snapshot (`--satellite`).
 │   └── run_{core|satellite}_YYYYMMDD_HHMM.log  ← Log file per run, tagged by book.
@@ -112,7 +122,7 @@ tiger_portfolio/
 - `modules/transform.py`'s `classify_tiers()` drops any position not in the active book's `TICKER_TIERS` (tier `Unknown`) before computing totals — this is what stops the two books' positions from bleeding into each other's weight/drift math when they share one account
 - Separate `OUTPUT_PATH` / `SNAPSHOT_PATH` / `DASHBOARD_PATH` per book (set in each settings module) so running both never overwrites the other's files
 
-**Known gap:** 1 share of `MRVL` (cost $300.34) is held in the account but isn't in either book's `TICKER_TIERS` — invisible to both books' totals until added to one of them (or tracked manually). See the `MRVL` note in `WATCHLIST` in `config/settings_satellite.py`.
+**Was a known gap, now auto-checked:** a position held on Tiger but missing from both books' `TICKER_TIERS` used to be silently invisible — found that way with `D05.SI`/`MRVL` on 2026-11-09 (understated the Satellite total by ~$350). Every pipeline run now flags this automatically via `modules/audit.py`'s `check_unmapped_tickers()` — see [Adding a new ticker](#adding-a-new-ticker).
 
 ---
 
@@ -126,7 +136,7 @@ tiger_portfolio/
 | 📈 Holdings | extract + transform | All positions — price (blue/editable), shares, P&L, weight vs target |
 | ⚖️ Rebalance Signals | transform | Satellite drift signals: TRIM/ADD/HOLD, shares to trade, est. proceeds — **renders empty in the Core/Core-Plus book**; populated when run with `--satellite` |
 | 🎯 Entry Signals | transform | P/E scoring (1–5), stop-loss flags, entry/exit signals per position — **renders empty here**, same reason |
-| 📋 Audit | audit | Data freshness table + price drift vs snapshot (>10% flagged) |
+| 📋 Audit | audit | Data freshness table + price drift vs snapshot (>10% flagged) + unmapped tickers (held on Tiger, tracked by neither book) |
 | 👀 Watchlist | settings.WATCHLIST | All pending actions — **renders empty in the Core/Core-Plus book** (`WATCHLIST = {}` in `config/settings.py`); active theses live in `config/settings_satellite.py`, populated when run with `--satellite` |
 | 🔍 Screener | screener + yfinance | WATCHLIST tickers: P/E TTM, Fwd P/E, 5Y avg, premium, FCF yield, Quadrant D regime fit — **renders empty here**, same reason as Watchlist |
 
@@ -204,8 +214,9 @@ The `MACRO_REGIME` dict in settings.py drives the dashboard and the `REGIME_PLAY
 ### After executing a trade
 
 1. Run `python main.py` (hybrid mode auto-pulls new positions from Tiger)
-2. Check output Excel — verify new shares and signals
-3. Snapshot auto-saves for future offline use
+2. Check the Audit sheet's "Unmapped Tickers" section (or the log for `🚨 N ticker(s) held on Tiger but mapped in NEITHER book`) — if the trade was a brand-new symbol, it'll show up here until it's added to `TICKER_TIERS`. See [Adding a new ticker](#adding-a-new-ticker).
+3. Check output Excel — verify new shares and signals
+4. Snapshot auto-saves for future offline use
 
 ### 14-day review cycle
 
@@ -220,12 +231,15 @@ The `MACRO_REGIME` dict in settings.py drives the dashboard and the `REGIME_PLAY
 
 ### Adding a new ticker
 
-For Core/Core-Plus/Core-Bond, edit `config/settings.py`. For a new active/thesis-driven satellite position, edit `config/settings_satellite.py` instead — same steps, different file.
+**The pipeline catches this for you.** Every run checks live Tiger positions against the union of both books' `TICKER_TIERS` and flags anything in neither one (`modules/audit.py`'s `check_unmapped_tickers()`) — a log WARNING, `is_clean=False`, and an "Unmapped Tickers" section on the Audit sheet. A new discretionary buy (or a dividend reinvestment into a new symbol) gets caught automatically instead of silently vanishing from both books' totals — this is how a missing `D05.SI`/`MRVL` mapping was found on 2026-11-09, understating the Satellite total by ~$350 until someone noticed by hand.
+
+To resolve a flagged ticker (or add one proactively before buying it): for Core/Core-Plus/Core-Bond, edit `config/settings.py`. For a new active/thesis-driven satellite position, edit `config/settings_satellite.py` instead — same steps, different file.
 
 1. Add to `TICKER_TIERS` (Core book: `Core` / `Core-Bond` / `Core-Plus`; Satellite book: `Satellite`)
-2. Satellite book only: add to `SATELLITE_TARGETS` (rebalance the others so it still sums to 1.00) and `PE_5Y_AVERAGES`
-3. Add display name to `name_map` dict in load.py
-4. Run pipeline to verify (`python main.py` or `python main.py --satellite`)
+2. Satellite book only: add to `SATELLITE_TARGETS` (a small/placeholder weight is fine — the dict only has to sum between 0.95 and 1.10, it doesn't have to rescale every other target to stay at exactly 1.00) and `PE_5Y_AVERAGES` if a P/E thesis applies
+3. If the ticker isn't USD-denominated (e.g. an SGX-listed stock), add it to `TICKER_CURRENCY` in `settings_satellite.py` — e.g. `{'D05.SI': 'SGD'}`. Tiger/yfinance report price and avg_cost in the listing currency, and `extract.py` converts to USD using a live FX rate before any downstream math touches it. Skipping this understates/overstates the position's USD value by whatever the FX gap is, not just by omission.
+4. Add display name to `name_map` dict in load.py
+5. Run pipeline to verify (`python main.py` or `python main.py --satellite`) — confirm the Unmapped Tickers section is clear
 
 ### Adding a ticker to the Watchlist
 

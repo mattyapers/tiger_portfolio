@@ -218,6 +218,51 @@ def _fetch_yfinance_data(symbols):
     return df
 
 
+def _fetch_yfinance_data_resolved(symbols, settings):
+    """
+    Like _fetch_yfinance_data(), but resolves each symbol to its correct
+    yfinance ticker and converts a non-USD price to USD first, using:
+      - settings.IBKR_YF_SYMBOL_MAP (symbol -> {'yf': yfinance ticker,
+        'currency': ...}) — LSE-listed IBKR funds (CSPX, EIMI, etc.) need
+        a .L suffix yfinance won't infer from the bare symbol
+      - settings.TICKER_CURRENCY (symbol -> currency only, same yfinance
+        ticker as the display symbol) — e.g. D05.SI on SGX, where the
+        bare symbol already resolves correctly but reports in SGD
+
+    Use this instead of calling _fetch_yfinance_data() directly wherever
+    the symbol list might include one of these — extract_hybrid() and
+    extract_yf_only() both build their symbol list from TICKER_TIERS,
+    which can include both kinds. (extract_ibkr.py's broker-pulled paths
+    use their own equivalent, _fetch_yfinance_data_ibkr(), already wired.)
+    """
+    ibkr_map = getattr(settings, 'IBKR_YF_SYMBOL_MAP', {})
+    ticker_currency = getattr(settings, 'TICKER_CURRENCY', {})
+
+    resolved = {}  # display symbol -> (yf_ticker, currency)
+    for sym in symbols:
+        if sym in ibkr_map:
+            resolved[sym] = (ibkr_map[sym].get('yf', sym), ibkr_map[sym].get('currency', 'USD'))
+        elif sym in ticker_currency:
+            resolved[sym] = (sym, ticker_currency[sym])
+        else:
+            resolved[sym] = (sym, 'USD')
+
+    yf_symbols = [resolved[s][0] for s in symbols]
+    df = _fetch_yfinance_data(yf_symbols)
+
+    reverse = {yf_sym: sym for sym, (yf_sym, _) in resolved.items()}
+    df['symbol'] = df['symbol'].map(lambda s: reverse.get(s, s))
+
+    if any(currency != 'USD' for _, currency in resolved.values()):
+        from modules.extract_ibkr import _get_fx_to_usd
+        for idx, row in df.iterrows():
+            currency = resolved.get(row['symbol'], (None, 'USD'))[1]
+            if currency != 'USD' and pd.notna(row['latest_price']):
+                df.at[idx, 'latest_price'] = row['latest_price'] * _get_fx_to_usd(currency)
+
+    return df
+
+
 # ════════════════════════════════════════════════════════════
 # MERGE + VALIDATE
 # ════════════════════════════════════════════════════════════
@@ -236,12 +281,14 @@ def _merge_and_fix(tiger_df, yf_df, settings):
                                 'sector', 'country']],
                         on='symbol', how='left')
 
-    # Convert non-USD-listed tickers (e.g. D05.SI trades in SGD on SGX) to
-    # USD before any other math touches price/cost/market value — both
-    # Tiger's reported figures and yfinance's price are in the LISTING
-    # currency, so converting price, avg_cost, AND tiger_market_value here
-    # keeps the inflated-share check below (which compares them) internally
-    # consistent, instead of comparing a USD figure against an SGD one.
+    # Convert Tiger's raw figures for non-USD-listed tickers (e.g. D05.SI
+    # trades in SGD on SGX) to USD — avg_cost and tiger_market_value come
+    # straight from the Tiger API and are never touched by yfinance, so
+    # they still need converting here even though yf_df's latest_price is
+    # already USD by this point (callers fetch it via
+    # _fetch_yfinance_data_resolved() / _fetch_yfinance_data_ibkr(), both
+    # of which convert price before it gets here — converting it AGAIN
+    # would double-apply the FX rate).
     ticker_currency = getattr(settings, 'TICKER_CURRENCY', {})
     if ticker_currency:
         from modules.extract_ibkr import _get_fx_to_usd
@@ -250,10 +297,9 @@ def _merge_and_fix(tiger_df, yf_df, settings):
             if not mask.any() or currency == 'USD':
                 continue
             fx = _get_fx_to_usd(currency)
-            df.loc[mask, 'latest_price'] = df.loc[mask, 'latest_price'] * fx
             df.loc[mask, 'avg_cost'] = df.loc[mask, 'avg_cost'] * fx
             df.loc[mask, 'tiger_market_value'] = df.loc[mask, 'tiger_market_value'] * fx
-            logger.info(f"  {sym}: converted {currency}->USD at {fx:.4f}")
+            logger.info(f"  {sym}: converted avg_cost/tiger_market_value {currency}->USD at {fx:.4f}")
 
     # Detect inflated share counts
     has_price = df['latest_price'].notna() & (df['latest_price'] > 0)
@@ -319,7 +365,7 @@ def extract_hybrid(settings):
     all_symbols = list(set(
         tiger_df['symbol'].tolist() + list(settings.TICKER_TIERS.keys())
     ))
-    yf_df = _fetch_yfinance_data(all_symbols)
+    yf_df = _fetch_yfinance_data_resolved(all_symbols, settings)
     merged = _merge_and_fix(tiger_df, yf_df, settings)
 
     total_mv = merged['market_value'].sum()
@@ -408,7 +454,7 @@ def extract_yf_only(settings):
 
     offline = extract_offline(settings)
     symbols = offline['positions']['symbol'].tolist()
-    yf_df = _fetch_yfinance_data(symbols)
+    yf_df = _fetch_yfinance_data_resolved(symbols, settings)
 
     df = offline['positions'].copy()
     price_map = yf_df.set_index('symbol')
