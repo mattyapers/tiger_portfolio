@@ -576,6 +576,8 @@ def load_to_excel(analytics, settings):
         'TIP5': 'iShares TIPS UCITS',
         'IBTS': 'iShares $ Treasury 0-1yr UCITS',
         'IBKR': 'Interactive Brokers Group',
+        'D05.SI': 'DBS Group Holdings',
+        'MRVL': 'Marvell Technology',
     }
     holdings['name'] = holdings['symbol'].map(name_map).fillna('')
 

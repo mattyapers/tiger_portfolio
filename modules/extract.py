@@ -236,6 +236,25 @@ def _merge_and_fix(tiger_df, yf_df, settings):
                                 'sector', 'country']],
                         on='symbol', how='left')
 
+    # Convert non-USD-listed tickers (e.g. D05.SI trades in SGD on SGX) to
+    # USD before any other math touches price/cost/market value — both
+    # Tiger's reported figures and yfinance's price are in the LISTING
+    # currency, so converting price, avg_cost, AND tiger_market_value here
+    # keeps the inflated-share check below (which compares them) internally
+    # consistent, instead of comparing a USD figure against an SGD one.
+    ticker_currency = getattr(settings, 'TICKER_CURRENCY', {})
+    if ticker_currency:
+        from modules.extract_ibkr import _get_fx_to_usd
+        for sym, currency in ticker_currency.items():
+            mask = df['symbol'] == sym
+            if not mask.any() or currency == 'USD':
+                continue
+            fx = _get_fx_to_usd(currency)
+            df.loc[mask, 'latest_price'] = df.loc[mask, 'latest_price'] * fx
+            df.loc[mask, 'avg_cost'] = df.loc[mask, 'avg_cost'] * fx
+            df.loc[mask, 'tiger_market_value'] = df.loc[mask, 'tiger_market_value'] * fx
+            logger.info(f"  {sym}: converted {currency}->USD at {fx:.4f}")
+
     # Detect inflated share counts
     has_price = df['latest_price'].notna() & (df['latest_price'] > 0)
     expected_mv = df['tiger_shares'] * df['latest_price']

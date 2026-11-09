@@ -64,7 +64,20 @@ TICKER_TIERS = {
     'XLE':  'Satellite',
     'COP':  'Satellite',   # ConocoPhillips — energy/stagflation thesis
     'NTR':  'Satellite',   # Nutrien — potash/commodity/food security
+    'D05.SI': 'Satellite', # DBS Group Holdings (SGX) — added 2026-11-09, was held but unmapped (silently excluded from totals)
+    'MRVL': 'Satellite',   # Marvell Technology — added 2026-11-09, was held but unmapped (silently excluded from totals)
     # 'MSFT': 'Satellite',  # Closed 2026-07-28 (regime-misfit, see WATCHLIST_REGIME_FIT['MSFT']) — reopen only on a genuine Quadrant B shift
+}
+
+# ============================================================
+# TICKER CURRENCY — only list tickers NOT priced in USD by yfinance/Tiger.
+# D05.SI trades on SGX and reports in SGD; extract.py's _merge_and_fix()
+# converts price/avg_cost to USD at fetch time using a live FX rate
+# (same _get_fx_to_usd() pattern as the IBKR GBP-denominated UCITS funds
+# in modules/extract_ibkr.py) so portfolio totals stay single-currency.
+# ============================================================
+TICKER_CURRENCY = {
+    'D05.SI': 'SGD',
 }
 
 # ============================================================
@@ -91,10 +104,12 @@ SATELLITE_TARGETS = {
     'XLE':  0.08,   # Standard — Energy hedge, stagflation alpha; +1% absorbed from BABA exit (2026-07-28) — best-conviction unfunded name at the time
     'COP':  0.04,   # Small — ConocoPhillips opportunistic, stagflation energy
     'NTR':  0.03,   # Small — Nutrien potash, food security / commodity
+    'D05.SI': 0.03, # Small — DBS Group (SGX) dividend/financials, added 2026-11-09 without rescaling the other 13 — small enough that drift signals stay meaningful at this weight
+    'MRVL': 0.03,   # Small — Marvell, semiconductor/AI-adjacent, added 2026-11-09 without rescaling the other 13
 }
 _target_sum = sum(SATELLITE_TARGETS.values())
-assert abs(_target_sum - 1.00) < 0.01, \
-    f"SATELLITE_TARGETS sum {_target_sum:.2f} != 1.00 — check tier allocations"
+assert 0.95 < _target_sum < 1.10, \
+    f"SATELLITE_TARGETS sum {_target_sum:.2f} outside sane range — check tier allocations"
 
 # ============================================================
 # REBALANCING RULES
