@@ -32,6 +32,14 @@ PRIVATE_KEY_PATH = os.getenv('TIGER_PRIVATE_KEY_PATH', 'config/tiger_private_key
 LICENSE = os.getenv('TIGER_LICENSE', 'TBSG')
 
 # ============================================================
+# IBKR API CONFIG (loaded from .env — only used with --ibkr / --multi-broker)
+# ============================================================
+IBKR_HOST = os.getenv('IBKR_HOST', '127.0.0.1')
+IBKR_PORT = int(os.getenv('IBKR_PORT', '7496'))
+IBKR_CLIENT_ID = int(os.getenv('IBKR_CLIENT_ID', '1'))
+IBKR_ACCOUNT = os.getenv('IBKR_ACCOUNT', '')
+
+# ============================================================
 # PORTFOLIO STRUCTURE — single tier, 100% of THIS book
 # ============================================================
 # There is only one tier here on purpose: this whole book IS the
@@ -116,17 +124,18 @@ SIGNAL_RULES = {
 # 5-YEAR AVERAGE P/E RATIOS (updated 2026-07-24)
 # ============================================================
 PE_5Y_AVERAGES = {
-    'GOOG': 25.0,
-    'RTX':  33.0,
-    'NVDA': 65.0,
-    'TSM':  23.0,
-    'AAPL': 30.0,
-    'MA':   36.0,
-    'CAT':  20.0,
-    'KO':   25.5,
-    'AON':  25.0,   # Unresolved — no clean 5Y avg found in last refresh, kept prior value
-    'COP':  14.0,   # Energy cyclical — 5Y avg depressed by 2020 crash
-    'NTR':  34.0,
+    # Refreshed 2026-11-09 via Macrotrends/fullratio/financecharts cross-check
+    'GOOG': 24.0,
+    'RTX':  34.0,
+    'NVDA': 58.0,   # down from 65.0 — multi-year blended average drifting lower as 2021-22 peak-multiple years roll out of the 5Y window
+    'TSM':  24.0,
+    'AAPL': 31.0,
+    'MA':   35.5,
+    'CAT':  22.0,   # wide source spread this refresh (20.6-25.7) — one Macrotrends mirror flagged stale data through Jul 2025; treat as directional, re-verify next refresh
+    'KO':   25.5,   # unchanged, confirmed still accurate
+    'AON':  31.0,   # RESOLVED — prior 25.0 was a stale placeholder ("no clean 5Y avg found"); real figure clusters 31.0-31.2 across sources
+    'COP':  14.0,   # unchanged — energy cyclical, 5Y avg still depressed by 2020 crash
+    'NTR':  34.0,   # unchanged, confirmed still accurate (34.12 sourced)
 }
 
 # ============================================================
@@ -225,13 +234,13 @@ DATA_FRESHNESS = {
         'update_action': 'Update MACRO_REGIME dict + open_inflections in settings_satellite.py; bump value here',
     },
     'pe_5y_averages': {
-        'value':         '2026-07-24',
+        'value':         '2026-11-09',
         'cadence_days':  90,
         'label':         '5Y P/E averages (quarterly)',
         'update_action': 'Refresh PE_5Y_AVERAGES from Macrotrends/YF; bump value here',
     },
     'satellite_targets': {
-        'value':         '2026-08-29',
+        'value':         '2026-11-09',
         'cadence_days':  30,
         'label':         'Satellite tier weights',
         'update_action': 'Review SATELLITE_TARGETS for post-trade changes; bump value here',

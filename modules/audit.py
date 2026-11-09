@@ -61,13 +61,19 @@ def validate_freshness(settings):
     return is_clean, report
 
 
-def price_sanity_check(holdings_df, tolerance=0.10):
+def price_sanity_check(holdings_df, tolerance=0.10, yf_symbol_map=None):
     """
     Compare each held position's `latest_price` to live yfinance spot.
 
     Flags any position whose drift exceeds `tolerance` (default 10%).
     Useful for catching cases where SNAPSHOT_DATE was bumped but the
     hardcoded prices in extract_offline() were not refreshed.
+
+    yf_symbol_map: optional {display_symbol: {'yf': yf_ticker, 'currency': ..}}
+    override for symbols yfinance can't resolve directly (e.g. LSE UCITS
+    funds need a .L suffix) — see settings.IBKR_YF_SYMBOL_MAP. snap_price
+    is assumed to already be in USD (extract_ibkr.py converts at fetch
+    time), so a non-USD spot is converted to USD here before comparing.
 
     Returns: list[dict] of flagged positions. Empty list if all within tolerance.
     Returns empty list (not None) on yfinance failures so the audit always renders.
@@ -82,17 +88,25 @@ def price_sanity_check(holdings_df, tolerance=0.10):
     if holdings_df is None or holdings_df.empty:
         return flagged
 
+    yf_symbol_map = yf_symbol_map or {}
+
     for _, row in holdings_df.iterrows():
         sym = row.get('symbol')
         snap_price = row.get('latest_price')
         if not sym or snap_price is None or snap_price <= 0:
             continue
+        mapping = yf_symbol_map.get(sym, {})
+        yf_symbol = mapping.get('yf', sym)
         try:
-            fast = yf.Ticker(sym).fast_info
+            fast = yf.Ticker(yf_symbol).fast_info
             spot = fast.get('last_price') or fast.get('lastPrice')
             if spot is None or spot <= 0:
                 continue
             spot = float(spot)
+            currency = mapping.get('currency', 'USD')
+            if currency != 'USD':
+                from modules.extract_ibkr import _get_fx_to_usd
+                spot *= _get_fx_to_usd(currency)
             drift = (spot - snap_price) / snap_price
             if abs(drift) > tolerance:
                 flagged.append({

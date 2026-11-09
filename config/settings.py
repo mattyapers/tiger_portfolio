@@ -30,6 +30,14 @@ PRIVATE_KEY_PATH = os.getenv('TIGER_PRIVATE_KEY_PATH', 'config/tiger_private_key
 LICENSE = os.getenv('TIGER_LICENSE', 'TBSG')
 
 # ============================================================
+# IBKR API CONFIG (loaded from .env — only used with --ibkr / --multi-broker)
+# ============================================================
+IBKR_HOST = os.getenv('IBKR_HOST', '127.0.0.1')
+IBKR_PORT = int(os.getenv('IBKR_PORT', '7496'))
+IBKR_CLIENT_ID = int(os.getenv('IBKR_CLIENT_ID', '1'))
+IBKR_ACCOUNT = os.getenv('IBKR_ACCOUNT', '')
+
+# ============================================================
 # PORTFOLIO STRUCTURE — Core + Core-Plus only (long-term sleeve)
 # ============================================================
 # Rescaled from the original 68/11/21 split, dropping Satellite (21%) and
@@ -52,6 +60,49 @@ TICKER_TIERS = {
     'VTIP': 'Core-Bond',
     'SPYD': 'Core-Plus',
     'ONEQ': 'Core-Plus',
+    # IBKR account (manual entry — see IBKR_MANUAL_POSITIONS below).
+    # UCITS equity funds -> Core (mirror VXUS/VOO); UCITS bond funds ->
+    # Core-Bond; the IBKR stock itself -> Core-Plus (single-name, not an
+    # index fund, fits alongside SPYD/ONEQ).
+    'CSPX': 'Core',
+    'EIMI': 'Core',
+    'XUSE': 'Core',
+    'TIP5': 'Core-Bond',
+    'IBTS': 'Core-Bond',
+    'IBKR': 'Core-Plus',
+}
+
+# ============================================================
+# IBKR MANUAL POSITIONS — API locked (IBKR Lite = commission-free, no TWS
+# API access; only IBKR Pro unlocks it). extract_multi_broker_manual()
+# (modules/extract_ibkr.py) reads this instead of connecting live.
+# Update by hand each cycle from the IBKR app/web positions screen —
+# shares + avg cost in the LISTING currency (see IBKR_YF_SYMBOL_MAP for
+# which ones are GBP vs USD; conversion to USD happens automatically at
+# fetch time using a live FX rate).
+# ============================================================
+IBKR_MANUAL_POSITIONS = {
+    # Captured 2026-11-09 from IBKR positions screen.
+    'IBKR': {'shares': 0.5478,   'avg_cost': 85.765},   # USD
+    'TIP5': {'shares': 86.5785,  'avg_cost': 5.020},     # USD
+    'EIMI': {'shares': 10.4315,  'avg_cost': 55.063},    # USD
+    # CSPX avg cost truncated in the source screenshot ("831....") —
+    # placeholder below, confirm exact figure from IBKR and correct.
+    'CSPX': {'shares': 2.2593,   'avg_cost': 831.00},    # USD (UNCONFIRMED — verify)
+    'XUSE': {'shares': 217.6149, 'avg_cost': 5.3848},    # GBP
+    'IBTS': {'shares': 0.9,      'avg_cost': 95.562},    # GBP
+}
+
+# Display symbol -> (yfinance ticker, listing currency). LSE UCITS funds
+# need the .L suffix for yfinance; IBKR stock itself trades directly on
+# NASDAQ under its own ticker, no suffix.
+IBKR_YF_SYMBOL_MAP = {
+    'CSPX': {'yf': 'CSPX.L', 'currency': 'USD'},
+    'EIMI': {'yf': 'EIMI.L', 'currency': 'USD'},
+    'XUSE': {'yf': 'XUSE.L', 'currency': 'GBP'},
+    'TIP5': {'yf': 'TIP5.L', 'currency': 'USD'},
+    'IBTS': {'yf': 'IBTS.L', 'currency': 'GBP'},
+    'IBKR': {'yf': 'IBKR',   'currency': 'USD'},
 }
 
 # ============================================================
@@ -197,6 +248,12 @@ DATA_FRESHNESS = {
         'cadence_days':  14,
         'label':         'extract_offline() prices',
         'update_action': 'Run main.py --yf-only or --hybrid; SNAPSHOT_DATE auto-syncs',
+    },
+    'ibkr_manual_positions': {
+        'value':         '2026-11-09',
+        'cadence_days':  14,
+        'label':         'IBKR manual positions (API locked, IBKR Lite)',
+        'update_action': 'Re-check IBKR app/web positions screen; update IBKR_MANUAL_POSITIONS dict',
     },
 }
 

@@ -6,9 +6,21 @@ USAGE:
   python main.py --satellite      → Satellite/risk book instead (config/settings_satellite.py)
   python main.py --yf-only        → Offline shares + yfinance prices (no Tiger needed)
   python main.py --offline        → Manual snapshot data, no API calls
-  python main.py --ibkr           → Hybrid mode via IBKR instead of Tiger (draft, see
+  python main.py --ibkr           → Hybrid mode via IBKR instead of Tiger — use only if IBKR is
+                                     REPLACING Tiger for this book's positions (draft, see
                                      modules/extract_ibkr.py — requires TWS/IB Gateway running
-                                     locally + ib_insync installed; ignored with --yf-only/--offline)
+                                     locally + ib_async installed; ignored with --yf-only/--offline)
+  python main.py --multi-broker   → Hybrid mode, Tiger + IBKR positions SUMMED per ticker — use
+                                     when both accounts hold genuinely separate/overlapping
+                                     positions that both need to count toward this book's totals.
+                                     Same requirements as --ibkr (TWS/Gateway + ib_async).
+  python main.py --multi-broker-manual → Same as --multi-broker, but IBKR positions come from
+                                     IBKR_MANUAL_POSITIONS (config/settings.py) instead of a
+                                     live API call — use this if IBKR API access is locked
+                                     (e.g. IBKR Lite/commission-free accounts don't get TWS API
+                                     access at all). No ib_async/TWS needed for the IBKR side.
+                                     Takes priority over --multi-broker/--ibkr if more than one
+                                     is passed.
   (flags combine, e.g. python main.py --satellite --offline)
 
 Both books share every module in modules/ — they only differ in which
@@ -125,8 +137,14 @@ def run_pipeline(mode='hybrid', broker='tiger'):
     # STAGE 1: EXTRACT
     logger.info("STAGE 1: Extracting data...")
     if mode == 'hybrid':
-        if broker == 'ibkr':
-            from modules.extract_ibkr import extract_ibkr_hybrid  # lazy import — ib_insync optional dependency
+        if broker == 'multi-broker-manual':
+            from modules.extract_ibkr import extract_multi_broker_manual  # lazy import
+            raw_data = extract_multi_broker_manual(settings)
+        elif broker == 'multi-broker':
+            from modules.extract_ibkr import extract_multi_broker_hybrid  # lazy import — ib_async optional dependency
+            raw_data = extract_multi_broker_hybrid(settings)
+        elif broker == 'ibkr':
+            from modules.extract_ibkr import extract_ibkr_hybrid  # lazy import — ib_async optional dependency
             raw_data = extract_ibkr_hybrid(settings)
         else:
             raw_data = extract_hybrid(settings)
@@ -141,7 +159,8 @@ def run_pipeline(mode='hybrid', broker='tiger'):
     # Price drift check — only meaningful in offline mode (other modes just refreshed prices)
     price_drift = []
     if mode == 'offline':
-        price_drift = price_sanity_check(raw_data['positions'], tolerance=0.10)
+        price_drift = price_sanity_check(raw_data['positions'], tolerance=0.10,
+                                          yf_symbol_map=getattr(settings, 'IBKR_YF_SYMBOL_MAP', {}))
 
     # STAGE 2: TRANSFORM
     logger.info("STAGE 2: Calculating metrics...")
@@ -218,5 +237,12 @@ if __name__ == '__main__':
         mode = 'yf-only'
     else:
         mode = 'hybrid'
-    broker = 'ibkr' if '--ibkr' in args else 'tiger'
+    if '--multi-broker-manual' in args:
+        broker = 'multi-broker-manual'
+    elif '--multi-broker' in args:
+        broker = 'multi-broker'
+    elif '--ibkr' in args:
+        broker = 'ibkr'
+    else:
+        broker = 'tiger'
     run_pipeline(mode=mode, broker=broker)

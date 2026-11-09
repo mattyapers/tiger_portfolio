@@ -13,22 +13,302 @@ import numpy as np
 import yfinance as yf
 
 
+# Shared CSS for both the main dashboard page and the macro overview page —
+# two self-contained HTML files that cross-link to each other (see
+# generate_html_dashboard()), not one page with a macro section bolted on.
+_CSS = """
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 12px;
+        }
+        .nav-link {
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #1f77b4;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .nav-link:hover {
+            text-decoration: underline;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #1f77b4;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .info-tip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #1f77b4;
+            color: #fff;
+            font-size: 10px;
+            font-weight: bold;
+            font-style: normal;
+            text-transform: none;
+            cursor: help;
+            margin-left: 5px;
+            position: relative;
+            vertical-align: middle;
+        }
+        .info-tip::after {
+            content: attr(data-tip);
+            display: none;
+            position: absolute;
+            bottom: 130%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: normal;
+            white-space: normal;
+            width: 260px;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            line-height: 1.4;
+        }
+        .info-tip:hover::after {
+            display: block;
+        }
+        .metric-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+        .metric-value.positive {
+            color: #27ae60;
+        }
+        .metric-value.negative {
+            color: #e74c3c;
+        }
+        .allocation-chart {
+            max-width: 400px;
+            height: 280px;
+            position: relative;
+            margin: 0 auto 30px;
+        }
+        .holdings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+        }
+        .sector-divider {
+            grid-column: 1 / -1;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            padding-bottom: 6px;
+            margin-top: 10px;
+            border-bottom: 2px solid #1f77b4;
+        }
+        .sector-divider:first-child {
+            margin-top: 0;
+        }
+        .holding-card {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+        .holding-card h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .holding-card .price {
+            font-weight: 600;
+            color: #1f77b4;
+        }
+        .holding-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 12px;
+        }
+        .holding-stat label {
+            color: #999;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #1f77b4;
+            transition: width 0.3s;
+        }
+        .macro-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 15px;
+        }
+        .macro-card {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: left;
+            border: 1px solid #e0e0e0;
+        }
+        .macro-card .label {
+            font-size: 11px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .macro-card .value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            line-height: 1.3;
+        }
+        .rsi {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .rsi.overbought {
+            background: #ffe0e0;
+            color: #e74c3c;
+        }
+        .rsi.neutral {
+            background: #e0f0ff;
+            color: #1f77b4;
+        }
+        .rsi.oversold {
+            background: #e0ffe0;
+            color: #27ae60;
+        }
+        .appendix {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .appendix h4 {
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .appendix p {
+            margin-bottom: 8px;
+        }
+        .disclaimer {
+            background: #fffbea;
+            border-left: 4px solid #f39c12;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+"""
+
+
 def load_snapshot(snapshot_path="output/latest_snapshot.json"):
     """Load portfolio snapshot from JSON."""
     with open(snapshot_path, "r") as f:
         return json.load(f)
 
 
-def fetch_technical_data(symbols, lookback_days=365):
+def fetch_technical_data(symbols, lookback_days=365, yf_symbol_map=None):
     """
     Fetch technical indicators for holdings.
-    Returns: dict with RSI, 52-week high/low, 50/200-day MAs.
+    Returns: dict with RSI, 52-week high/low, 50/200-day MAs, keyed by the
+    original display symbol (not the resolved yfinance ticker).
+
+    yf_symbol_map: optional {display_symbol: {'yf': yf_ticker, ...}} override
+    for symbols yfinance can't resolve directly (e.g. LSE UCITS funds need
+    a .L suffix) — see settings.IBKR_YF_SYMBOL_MAP. Values for a symbol
+    resolved this way stay in that fund's LISTING currency (not converted
+    to USD here), since this is relative technical data (RSI, % from
+    52w high/low), not portfolio-value math.
     """
     technical_data = {}
-    
+    yf_symbol_map = yf_symbol_map or {}
+
     for symbol in symbols:
+        yf_symbol = yf_symbol_map.get(symbol, {}).get('yf', symbol)
         try:
-            ticker = yf.Ticker(symbol)
+            ticker = yf.Ticker(yf_symbol)
             hist = ticker.history(period=f"{lookback_days}d")
             
             if len(hist) < 50:
@@ -211,37 +491,41 @@ def calculate_portfolio_overview(snapshot, settings):
     }
 
 
-def _sector_of(holding):
+def _sector_of(holding, yf_symbol_map=None):
     """
     GICS sector for a holding. Prefers the value already captured in the
     snapshot (extract.py saves it per-position now) to avoid a redundant
     yfinance call; falls back to a live lookup for snapshots saved before
-    that field existed.
+    that field existed. UCITS/ETF holdings (no GICS sector) also fall
+    through here, so this also resolves the symbol via yf_symbol_map
+    (e.g. settings.IBKR_YF_SYMBOL_MAP) for LSE-listed funds.
     """
     sector = holding.get("sector")
     if sector:
         return sector
+    yf_symbol = (yf_symbol_map or {}).get(holding["symbol"], {}).get('yf', holding["symbol"])
     try:
-        return yf.Ticker(holding["symbol"]).info.get("sector") or "Unknown"
+        return yf.Ticker(yf_symbol).info.get("sector") or "Unknown"
     except Exception:
         return "Unknown"
 
 
-def _country_of(holding):
+def _country_of(holding, yf_symbol_map=None):
     """
     Listing-exchange geography for a holding: where the instrument trades
     (e.g. a US-listed ADR is 'United States' regardless of where the
     underlying business is headquartered), not a revenue look-through.
     Same snapshot-first, live-fallback pattern as _sector_of() — falls back
     to a live yfinance lookup only for snapshots saved before this field
-    existed.
+    existed, resolved via yf_symbol_map same as _sector_of().
     """
     country = holding.get("country")
     if country:
         return country
+    yf_symbol = (yf_symbol_map or {}).get(holding["symbol"], {}).get('yf', holding["symbol"])
     try:
         from modules.extract import _listing_country
-        return _listing_country(yf.Ticker(holding["symbol"]).info or {}) or "Unknown"
+        return _listing_country(yf.Ticker(yf_symbol).info or {}) or "Unknown"
     except Exception:
         return "Unknown"
 
@@ -279,7 +563,7 @@ def calculate_allocation_chart(holdings, settings):
     return labels, values, chart_title, members
 
 
-def calculate_exposure_charts(holdings):
+def calculate_exposure_charts(holdings, yf_symbol_map=None):
     """
     Build Sector Exposure and Geography Exposure doughnut charts — shown on
     both books, independent of the main allocation chart above. Geography is
@@ -287,8 +571,10 @@ def calculate_exposure_charts(holdings):
     a look-through of where the underlying business earns revenue.
     """
     total = sum(h["shares"] * h["latest_price"] for h in holdings)
-    sector_labels, sector_values, sector_members = _group_by(holdings, _sector_of, total)
-    geo_labels, geo_values, geo_members = _group_by(holdings, _country_of, total)
+    sector_labels, sector_values, sector_members = _group_by(
+        holdings, lambda h: _sector_of(h, yf_symbol_map), total)
+    geo_labels, geo_values, geo_members = _group_by(
+        holdings, lambda h: _country_of(h, yf_symbol_map), total)
     return {
         "sector": (sector_labels, sector_values, sector_members),
         "geography": (geo_labels, geo_values, geo_members),
@@ -296,7 +582,15 @@ def calculate_exposure_charts(holdings):
 
 
 def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json", output_path="output/dashboard.html"):
-    """Generate the self-contained HTML dashboard."""
+    """
+    Generate two cross-linked, self-contained HTML pages: the main
+    portfolio dashboard (output_path) and a separate Macro Overview page
+    (macro_output_path) — kept apart so the macro monitor doesn't crowd
+    out the holdings view, each still openable/shareable on its own.
+    """
+    macro_output_path = output_path.replace('.html', '_macro.html')
+    macro_filename = os.path.basename(macro_output_path)
+    main_filename = os.path.basename(output_path)
 
     # Load data
     snapshot = load_snapshot(snapshot_path)
@@ -306,10 +600,10 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     tier_map = settings.TICKER_TIERS
     holdings = [h for h in snapshot.get("holdings", []) if h["symbol"] in tier_map]
     symbols = [h["symbol"] for h in holdings]
-    technical = fetch_technical_data(symbols)
+    technical = fetch_technical_data(symbols, yf_symbol_map=getattr(settings, 'IBKR_YF_SYMBOL_MAP', {}))
     macro_items, macro_as_of = build_macro_cards(settings)
     chart_labels, chart_values, chart_title, chart_members = calculate_allocation_chart(holdings, settings)
-    exposure = calculate_exposure_charts(holdings)
+    exposure = calculate_exposure_charts(holdings, yf_symbol_map=getattr(settings, 'IBKR_YF_SYMBOL_MAP', {}))
     sector_labels, sector_values, sector_members = exposure["sector"]
     geo_labels, geo_values, geo_members = exposure["geography"]
 
@@ -356,266 +650,14 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-            line-height: 1.6;
-        }}
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }}
-        header {{
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }}
-        h1 {{
-            font-size: 28px;
-            margin-bottom: 5px;
-        }}
-        .timestamp {{
-            color: #666;
-            font-size: 12px;
-        }}
-        .section {{
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }}
-        .section h2 {{
-            font-size: 20px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 10px;
-        }}
-        .metrics-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }}
-        .metric-card {{
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 6px;
-            border-left: 4px solid #1f77b4;
-        }}
-        .metric-label {{
-            font-size: 12px;
-            color: #999;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-        }}
-        .info-tip {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #1f77b4;
-            color: #fff;
-            font-size: 10px;
-            font-weight: bold;
-            font-style: normal;
-            text-transform: none;
-            cursor: help;
-            margin-left: 5px;
-            position: relative;
-            vertical-align: middle;
-        }}
-        .info-tip::after {{
-            content: attr(data-tip);
-            display: none;
-            position: absolute;
-            bottom: 130%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #222;
-            color: #fff;
-            padding: 8px 10px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: normal;
-            white-space: normal;
-            width: 260px;
-            z-index: 100;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            line-height: 1.4;
-        }}
-        .info-tip:hover::after {{
-            display: block;
-        }}
-        .metric-value {{
-            font-size: 20px;
-            font-weight: 600;
-            color: #333;
-        }}
-        .metric-value.positive {{
-            color: #27ae60;
-        }}
-        .metric-value.negative {{
-            color: #e74c3c;
-        }}
-        .allocation-chart {{
-            max-width: 400px;
-            height: 280px;
-            position: relative;
-            margin: 0 auto 30px;
-        }}
-        .holdings-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 15px;
-        }}
-        .sector-divider {{
-            grid-column: 1 / -1;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #666;
-            padding-bottom: 6px;
-            margin-top: 10px;
-            border-bottom: 2px solid #1f77b4;
-        }}
-        .sector-divider:first-child {{
-            margin-top: 0;
-        }}
-        .holding-card {{
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #e0e0e0;
-        }}
-        .holding-card h3 {{
-            font-size: 16px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }}
-        .holding-card .price {{
-            font-weight: 600;
-            color: #1f77b4;
-        }}
-        .holding-stat {{
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            font-size: 12px;
-        }}
-        .holding-stat label {{
-            color: #999;
-        }}
-        .progress-bar {{
-            width: 100%;
-            height: 6px;
-            background: #e0e0e0;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 8px;
-        }}
-        .progress-fill {{
-            height: 100%;
-            background: #1f77b4;
-            transition: width 0.3s;
-        }}
-        .macro-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 15px;
-        }}
-        .macro-card {{
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 6px;
-            text-align: left;
-            border: 1px solid #e0e0e0;
-        }}
-        .macro-card .label {{
-            font-size: 11px;
-            color: #666;
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }}
-        .macro-card .value {{
-            font-size: 14px;
-            font-weight: 600;
-            color: #333;
-            line-height: 1.3;
-        }}
-        .rsi {{
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
-            font-size: 12px;
-            font-weight: 600;
-            text-align: center;
-        }}
-        .rsi.overbought {{
-            background: #ffe0e0;
-            color: #e74c3c;
-        }}
-        .rsi.neutral {{
-            background: #e0f0ff;
-            color: #1f77b4;
-        }}
-        .rsi.oversold {{
-            background: #e0ffe0;
-            color: #27ae60;
-        }}
-        .appendix {{
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 6px;
-            font-size: 12px;
-            color: #666;
-            margin-top: 20px;
-            border-top: 1px solid #e0e0e0;
-        }}
-        .appendix h4 {{
-            font-size: 13px;
-            margin-bottom: 8px;
-            color: #333;
-        }}
-        .appendix p {{
-            margin-bottom: 8px;
-        }}
-        .disclaimer {{
-            background: #fffbea;
-            border-left: 4px solid #f39c12;
-            padding: 15px;
-            border-radius: 4px;
-            font-size: 12px;
-            margin-top: 20px;
-        }}
-        .chart-container {{
-            position: relative;
-            height: 300px;
-            margin-bottom: 20px;
-        }}
-    </style>
+    <style>{_CSS}</style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Portfolio Dashboard</h1>
             <p class="timestamp">Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Data snapshot: {snapshot.get("timestamp", "N/A")}</p>
+            <a class="nav-link" href="{macro_filename}">Macro Overview →</a>
         </header>
 
         <!-- SECTION 1: PORTFOLIO OVERVIEW -->
@@ -794,34 +836,12 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
             </div>
         </div>
 
-        <!-- SECTION 3: MACRO MONITOR -->
-        <div class="section">
-            <h2>Macro Monitor</h2>
-            <p style="font-size: 12px; color: #666; margin-top: -10px; margin-bottom: 15px;">
-                Source: MACRO_REGIME (config/settings*.py) — as of {macro_as_of}. Updated via the Stage 0/1/2 review cycle, not a live feed.
-            </p>
-            <div class="macro-grid">
-"""
-
-    for label, value, desc in macro_items:
-        html += f"""
-                <div class="macro-card">
-                    <div class="label">{label}</div>
-                    <div class="value">{value}</div>
-                    <div style="font-size: 11px; color: #555; margin-top: 5px; line-height: 1.4;">{desc}</div>
-                </div>
-"""
-
-    html += f"""
-            </div>
-        </div>
-
         <!-- APPENDIX & DISCLAIMER -->
         <div class="section">
             <div class="appendix">
                 <h4>📊 Data Sources & Refresh Cadence</h4>
                 <p><strong>Holdings & Pricing:</strong> Yahoo Finance (yfinance) — Real-time during market hours</p>
-                <p><strong>Macro/Regime Data:</strong> MACRO_REGIME dict in config/settings.py or settings_satellite.py — manually refreshed each cycle via the Stage 0/1/2 review workflow (see prompts/), not a live feed. See the "as of" date above the Macro Monitor section.</p>
+                <p><strong>Macro/Regime Data:</strong> See the <a href="{macro_filename}">Macro Overview</a> page — sourced from MACRO_REGIME in config/settings.py or settings_satellite.py, manually refreshed each cycle via the Stage 0/1/2 review workflow (see prompts/), not a live feed.</p>
                 <p><strong>Technical Indicators:</strong> Calculated from 1-year historical price data (yfinance) — Daily</p>
                 <p><strong>Recommended Refresh:</strong> Daily (EOD) for position tracking; Weekly for macro/technical analysis</p>
             </div>
@@ -937,13 +957,70 @@ def generate_html_dashboard(settings, snapshot_path="output/latest_snapshot.json
 </body>
 </html>
 """
-    
-    # Write to file
+
+    # SECTION: MACRO OVERVIEW — separate page, cross-linked from the main
+    # dashboard's nav-link (and vice versa), not a section on the same page.
+    macro_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Macro Overview</title>
+    <style>{_CSS}</style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Macro Overview</h1>
+            <p class="timestamp">Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Regime as of: {macro_as_of}</p>
+            <a class="nav-link" href="{main_filename}">← Back to Portfolio Dashboard</a>
+        </header>
+
+        <div class="section">
+            <h2>Macro Monitor</h2>
+            <p style="font-size: 12px; color: #666; margin-top: -10px; margin-bottom: 15px;">
+                Source: MACRO_REGIME (config/settings*.py) — as of {macro_as_of}. Updated via the Stage 0/1/2 review cycle, not a live feed.
+            </p>
+            <div class="macro-grid">
+"""
+
+    for label, value, desc in macro_items:
+        macro_html += f"""
+                <div class="macro-card">
+                    <div class="label">{label}</div>
+                    <div class="value">{value}</div>
+                    <div style="font-size: 11px; color: #555; margin-top: 5px; line-height: 1.4;">{desc}</div>
+                </div>
+"""
+
+    macro_html += f"""
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="appendix">
+                <h4>📊 Data Source</h4>
+                <p><strong>Macro/Regime Data:</strong> MACRO_REGIME dict in config/settings.py or settings_satellite.py — manually refreshed each cycle via the Stage 0/1/2 review workflow (see prompts/), not a live feed.</p>
+                <p><strong>Recommended Refresh:</strong> Weekly, alongside the Stage 0/1/2 review cycle.</p>
+            </div>
+            <div class="disclaimer">
+                ⚠️ <strong>Disclaimer:</strong> This page is for informational purposes only and does not constitute financial advice. Always consult a financial advisor before making investment decisions.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+    # Write both files
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
-    
+    with open(macro_output_path, "w", encoding="utf-8") as f:
+        f.write(macro_html)
+
     print(f"Dashboard generated: {output_path}")
+    print(f"Macro overview generated: {macro_output_path}")
     return output_path
 
 

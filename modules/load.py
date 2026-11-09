@@ -570,6 +570,12 @@ def load_to_excel(analytics, settings):
         'MSFT': 'Microsoft',
         'COP':  'ConocoPhillips',
         'NTR':  'Nutrien',
+        'CSPX': 'iShares Core S&P500 UCITS',
+        'EIMI': 'iShares MSCI EM IMI UCITS',
+        'XUSE': 'Xtrackers MSCI USA UCITS',
+        'TIP5': 'iShares TIPS UCITS',
+        'IBTS': 'iShares $ Treasury 0-1yr UCITS',
+        'IBKR': 'Interactive Brokers Group',
     }
     holdings['name'] = holdings['symbol'].map(name_map).fillna('')
 

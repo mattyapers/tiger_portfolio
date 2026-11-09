@@ -9,14 +9,15 @@ Guide for Claude Code in this repo.
 4. [Dependencies](#dependencies)
 5. [Architecture](#architecture)
 6. [Config](#configuration)
-7. [Data Contracts](#inter-stage-data-contracts)
-8. [Manual Updates](#manual-update-checklist-every-14-day-cycle)
-9. [Prompts](#prompts-directory)
-10. [External Skills](#external-finance-skills)
-11. [Add Ticker](#adding-a-new-ticker)
-12. [Testing](#testing)
-13. [Issues](#common-issues)
-14. [Protected Areas](#protected-areas)
+7. [Broker Routing](#broker-routing)
+8. [Data Contracts](#inter-stage-data-contracts)
+9. [Manual Updates](#manual-update-checklist-every-14-day-cycle)
+10. [Prompts](#prompts-directory)
+11. [External Skills](#external-finance-skills)
+12. [Add Ticker](#adding-a-new-ticker)
+13. [Testing](#testing)
+14. [Issues](#common-issues)
+15. [Protected Areas](#protected-areas)
 
 ---
 
@@ -32,12 +33,13 @@ Tiger Portfolio Tracker: Python ETL for automated portfolio management. Tiger Br
 
 | Command | Mode | Needs API? | Time |
 |---|---|---|---|
-| `python main.py` | Hybrid (default) | Yes | ~30s |
+| `python main.py` | Hybrid (default) | Yes (Tiger) | ~30s |
 | `python main.py --yf-only` | Offline shares + yfinance | No | ~15s |
 | `python main.py --offline` | Latest snapshot | No | Instant |
-| `python modules/dashboard.py` | Standalone HTML | No | ~5s |
+| `python main.py --multi-broker-manual` | Tiger (live) + IBKR (manual entry) | Yes (Tiger) | ~30s |
+| `python -m modules.dashboard` | Standalone HTML (must run as `-m`, not a direct script path, or the `config`/`modules` imports fail) | No | ~5s |
 
-Artifacts: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `output/run_YYYYMMDD_HHMM.log`.
+Artifacts: `output/portfolio_tracker.xlsx`, `output/latest_snapshot.json`, `output/run_YYYYMMDD_HHMM.log`, `output/dashboard.html` + `output/dashboard_macro.html` (two cross-linked pages — see [Broker Routing](#broker-routing) and `modules/dashboard.py`).
 
 ---
 
@@ -112,6 +114,30 @@ Two settings modules, same shape, loaded by `main.py` based on the `--satellite`
 - `WATCHLIST` / `WATCHLIST_REGIME_FIT`: the full active-thesis list (all entries that used to live in the single blended `settings.py`)
 - `OUTPUT_PATH`/`SNAPSHOT_PATH`/`DASHBOARD_PATH`: `output/satellite_tracker.xlsx` / `output/satellite_snapshot.json` / `output/satellite_dashboard.html` — deliberately different files so running both books never overwrites the other
 - `SNAPSHOT_DATE`: display label in Excel header (both modules have their own)
+
+---
+
+## Broker Routing
+
+Two brokers, split by instrument — not a migration, both stay in use permanently:
+
+| Broker | Covers | Access method |
+|---|---|---|
+| **Tiger Brokers** | US stocks + SGX (Singapore) stocks | Live API (`modules/extract.py`, `--hybrid`/default mode) — RSA-signed, credentials in `.env` |
+| **IBKR Lite** | London + Ireland-domiciled UCITS ETFs (CSPX, EIMI, XUSE, TIP5, IBTS) + the IBKR stock itself | **Manual entry** — IBKR Lite (commission-free) has no TWS/API access at all; only IBKR Pro unlocks it |
+
+**Why this split:** US/SG trades go through Tiger because that's the account with API access and the lower-cost venue for those markets (see cost-benefit note below). London/Ireland UCITS purchases are deliberately routed through IBKR for the Ireland tax-treaty benefit (15% vs 30% US dividend withholding) — bought once a month, low enough frequency that manual entry isn't a burden.
+
+**How the IBKR side works (`modules/extract_ibkr.py`):**
+- `IBKR_MANUAL_POSITIONS` (config/settings.py) — hand-entered `{symbol: {shares, avg_cost}}` from the IBKR app/web positions screen (see settings.py's `IBKR_MANUAL_POSITIONS` dict for the exact format and last-captured date)
+- `IBKR_YF_SYMBOL_MAP` — resolves each display symbol to its yfinance ticker + listing currency (LSE UCITS funds need a `.L` suffix; some quote in GBP, not USD)
+- `extract_multi_broker_manual()` — Tiger (live) + IBKR (manual) merged per-ticker via `_merge_broker_positions()`, with FX conversion to USD applied at fetch time (`_get_fx_to_usd()`) so avg_cost/price/market_value stay single-currency throughout
+- Run via `python main.py --multi-broker-manual`
+- Update cadence: `DATA_FRESHNESS['ibkr_manual_positions']` in settings.py — re-check the IBKR app each cycle and bump the dict + freshness value by hand, same as any other manually-maintained field
+
+**If IBKR is ever upgraded to Pro:** `--ibkr` and `--multi-broker` (live API via `ib_async`/TWS) are already built and wired in `main.py` — untested against a real connection, but ready to swap in for `--multi-broker-manual` without further code changes. Needs `ib_async` installed + TWS/IB Gateway running locally with API access enabled.
+
+**Secrets:** `IBKR_HOST`/`IBKR_PORT`/`IBKR_CLIENT_ID`/`IBKR_ACCOUNT` are `os.getenv()`-sourced from `.env` (gitignored), same pattern as the Tiger credentials — only used by the live `--ibkr`/`--multi-broker` path, not by `--multi-broker-manual`. `IBKR_MANUAL_POSITIONS`/`IBKR_YF_SYMBOL_MAP` (tracked, committed) hold only share counts, cost basis, and ticker mappings — no account identifiers or credentials.
 
 ---
 
@@ -232,6 +258,8 @@ Expected outputs (`--satellite`): `output/satellite_tracker.xlsx`, `output/satel
 | Excel `#REF!` | Ticker removed from `TICKER_TIERS` but still referenced; clean mapping in the relevant settings module. |
 | Dashboard missing data | Ensure the book's snapshot file exists (`SNAPSHOT_PATH`); regenerate if needed. |
 | A satellite ticker shows up in the Core/Core-Plus book (or vice versa) | Check `TICKER_TIERS` in both settings modules for an accidental duplicate — should always be disjoint. |
+| IBKR positions look stale/wrong | `--multi-broker-manual` reads `IBKR_MANUAL_POSITIONS` by hand — re-check the IBKR app and update that dict + `DATA_FRESHNESS['ibkr_manual_positions']`; it will never auto-refresh (IBKR Lite has no API). |
+| `--ibkr`/`--multi-broker` hang or fail to connect | Expected on IBKR Lite — no TWS/API access at that tier. Use `--multi-broker-manual` instead, or upgrade to IBKR Pro. |
 
 ---
 
