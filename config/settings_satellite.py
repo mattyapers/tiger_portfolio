@@ -137,31 +137,31 @@ PE_5Y_AVERAGES = {
 # REGIME_PLAYBOOK below are what actually differ, since only this book
 # has satellite positions to tilt.
 MACRO_REGIME = {
-    'as_of_date': '2026-09-14',
+    'as_of_date': '2026-11-09',
     'quadrant': 'D',
-    'regime_label': 'Stagflation / Hike-Risk — Hormuz Escalating (Vessel Struck), Ceasefire Dead; Inflation Improving but Rate Path Hawkish',
-    'confidence': 'high',   # BS flat ~$6.7T well under $7T holds D; rate-path risk flipped from cut-lean to hike-lean (Warsh Jackson Hole) pushes further from B, not toward it; Hormuz escalation (vessel struck Sep 13) reinforces stagflation leg via Brent spike
-    'fed_funds_rate': '3.50–3.75% (held since Jul 29 FOMC); Sep 16, 2026 FOMC decision pending — this read predates the outcome',
-    'fed_balance_sheet': '$6.70T total assets (H.4.1, wk of Sep 2); +$6B w/w, +$135B YoY — flat, not expanding; ~$300B below $7T QB trigger',
-    'pce_headline': '3.7% YoY (Jul print, released Aug 26) — latest available; Aug print due Sep 30',
-    'pce_core': '3.3% YoY (Jul print) — latest available; Aug CPI (Sep 11) improved to 3.35% headline / 2.45% core YoY, a positive lead into Sep 30 PCE',
-    'cpi_latest': '3.35% YoY headline / 2.45% core (Aug print, released Sep 11) — improved from Jul\'s 3.5%/3.3% PCE-adjacent reads',
-    'jobs_may': "No new print sourced this cycle; carried from last cycle — June payrolls +57k (vs 115k consensus), unemployment 4.2%; weak July print (per Aug 7 reporting) had deflated hike odds, since reversed by Warsh's hawkish Jackson Hole speech",
-    'yield_curve': '10Y 4.96% / 2Y 4.63% (Sep 11) ≈ +33bp; positive but narrower than Aug 27\'s +44bp — both legs shifted up ~30bp',
-    'vix': '16.34 (mid-Sep) — up from Aug 29\'s 14.57 2026-low but still in normal 15-25 band; no breach 25/35',
-    'brent': 'Sharp reversal higher: ~$102-104 (Sep 12-14), up from $87.46 (Aug 27) — renewed U.S.-Iran tit-for-tat strikes reignited war premium; opposite direction from last cycle\'s unwind',
-    'fedwatch_next_meeting': 'Sep 16 FOMC: hike-risk surged — Aug 31 CME read ~66% hike, a sharp reversal from Aug 29\'s 67.6% hold-lean, driven by Warsh\'s hawkish Jackson Hole speech; live/unresolved into the decision',
-    'fedwatch_dec_cumulative': 'CME FedWatch (Sep read): ~78.2% hold / 15.4% cut / 5.4% hike through Dec — calmer than the Sep meeting read implies; Sep hike-risk currently looks front-loaded rather than sustained into Dec, an internal inconsistency worth re-checking once the Sep 16 outcome lands',
-    'hormuz_status': 'CLOSED, Day 197, traffic ~90% below pre-conflict (5-11 ships/day vs ~125 normal) — escalated since last cycle: Iran reports a commercial vessel struck near Qeshm (Sep 13), and the planned Gulf-Iran talks on Oman\'s reopening plan were postponed indefinitely the same day. Reverses last cycle\'s cautious de-escalation read',
-    'tariff_section_122': 'Unchanged — Federal Circuit administrative stay (issued May 12) still in force pending appeal; no ruling found as of Sep 14, now stale since May',
-    'mas_stance': 'Unchanged since Jul 27 statement (S$NEER upper half of appreciating band); next quarterly statement due ~Oct 2026',
+    'regime_label': 'Stagflation/Hike Regime — Fed Held but Dec Hike Odds at 82.6%, Sep Inflation Reaccelerated, AI Sector Rotation Hit Satellite Tech Names',
+    'confidence': 'high',   # Rates leg: Oct28 hold was itself hawkish (2 dissents WANTED a hike), Dec hike odds now 82.6% (up from 78.3%) — strongest hike conviction this cycle. BS leg: flat $6.75T, still ~$250B under $7T. Both conditions still confirm D firmly
+    'fed_funds_rate': '3.75-4.00% (held at Oct 28 FOMC, 10-2 — Hammack & Cook dissented FOR a hike, a hawkish-leaning hold); next meeting Dec; CME FedWatch Dec hike probability 82.6% (up from 78.3% the day prior) — highest conviction yet',
+    'fed_balance_sheet': '$6.748-6.75T total assets (H.4.1, wk of Nov 4); +2.4% YoY, up slightly from $6.746T (Oct 28) — still flat, not expanding; ~$250B below $7T QB trigger',
+    'pce_headline': '3.6% YoY (Sep print, released Oct 29) — up from Aug\'s 3.4%, reaccelerated; +0.5% MoM, driven by an energy cost surge (consistent with Oct\'s Brent spike)',
+    'pce_core': '3.1% YoY (Sep print) — up from Aug\'s 3.0%; the Aug cooling was temporary, Sep reversed higher, explaining both the Sep hike and the now-elevated Dec hike odds',
+    'cpi_latest': '3.7% YoY headline (Sep print) — hottest reading this cycle, consistent with the PCE reacceleration',
+    'jobs_may': 'Sep payrolls badly missed: +29K vs ~85K consensus, unemployment 4.2%, Jul/Aug revised down a combined 60K — labor weakening even as inflation reaccelerated and Dec hike odds rose; this divergence (weak jobs + hot inflation + hike-lean Fed) is the clearest stagflation signature yet',
+    'yield_curve': '10Y 5.00% / 2Y 4.69% (Oct 23, latest sourced) ~= +31bp — narrower than early Oct\'s +44bp; re-verify next cycle given the Nov 5 vol spike likely moved both legs',
+    'vix': 'Spiked to 28.09 intraday (Nov 5, 7-month high) on the AI-stock selloff, moderated to 25.64 (Nov 6, -9.0%) — the first genuine volatility event this cycle, breaking the prior months\' low-VIX/high-geopolitical-risk complacency pattern. Still below the 35 emergency-protocol threshold',
+    'brent': 'Violent round trip: spiked above $110 (Nov 3) then crashed >13% in a week to below $98 (Nov 6), steepest weekly decline since March 2020, on hopes of a Middle East diplomatic breakthrough — a real de-escalation signal for once, though Iran\'s official position (strait closed until US accepts terms) hasn\'t changed, so treat the price move as hope, not confirmed resolution',
+    'fedwatch_next_meeting': 'Oct 28 FOMC: HELD 3.75-4.00%, 10-2 vote, 2 dissents (Hammack, Cook) wanted a hike — a hawkish hold, not a dovish one',
+    'fedwatch_dec_cumulative': 'Dec FOMC hike probability 82.6% (CME FedWatch, up from 78.3% the day before) — the clearest single-direction read all cycle, reinforced by the Sep inflation reacceleration',
+    'hormuz_status': 'Still officially CLOSED — Iran\'s Armed Forces say the strait stays shut until the US accepts Tehran\'s conditions; US Navy mine-clearing ongoing (100+ suspected mines found by underwater drones); Oman rescued 25 sailors from a burning tanker in the strait in late Oct. Brent\'s Nov 6 crash reflects market hope for a breakthrough, not an actual change in Iran\'s stated position — don\'t conflate the two',
+    'tariff_section_122': 'EXPIRED Jul 24, 2026 — replaced by Section 301 duties (10-12.5%, ~80 economies). No change this cycle',
+    'mas_stance': 'Oct 14 review: held all 3 NEER band params unchanged (2nd consecutive pause after Apr/Jul tightenings) — narrowed 2026 core inflation forecast to 1.5-2% from 1.5-2.5%',
     'open_inflections': [
-        'Sep 16 FOMC decision — live, hike-risk surged since Aug 29 (Warsh Jackson Hole speech); outcome will force a regime re-read next cycle regardless of direction',
-        'Hormuz escalation: vessel struck Sep 13 + Gulf-Iran talks postponed same day — track reversed from de-escalation to escalation since last cycle',
-        'Brent +17% in ~3 weeks ($87→$102) — war premium back in full; watch pass-through into next PCE/CPI prints',
-        'Iran-Israel-US: no ceasefire in force, Trump warning harsher retaliation if Iran strikes again — situation hardened, not softened, since Aug',
-        'Aug PCE release Sep 30 — first read testing whether Aug CPI\'s improvement (3.35%/2.45%) carries through to the Fed\'s preferred gauge',
-        'Section 122 tariff Federal Circuit stay unresolved since May — appeal outcome still pending',
+        'AI sector rotation — Nov 3 midterm ballot measures rejected AI data centers in 40/41 local votes, triggering a Nov 5 selloff: NVDA -9.3% ($181.60), TSM -10.8% ($353.10), GOOG -2.2% ($282.57), Philly Semi Index -12%. Characterized as a ~$70B hedge-fund deleveraging event (Jordi Visser), not a fundamental AI bubble pop — money rotating into industrials/banks/energy/"AI landlords," not exiting markets. Directly relevant to this book\'s GOOG/NVDA/TSM exposure',
+        'Dec hike odds at 82.6%, highest conviction this cycle, driven by Sep PCE/CPI reacceleration (3.6%/3.1%, 3.7% CPI) — the hike case just got stronger, not weaker',
+        'VIX\'s first real spike this cycle (28.09 intraday Nov 5) — the long-running calm-despite-chaos divergence finally broke; watch whether this normalizes or becomes a new higher-vol regime',
+        'Brent\'s >13% weekly crash (Nov 6) is a hope-driven move, not a confirmed Hormuz resolution — Iran\'s official stance is unchanged; don\'t treat the price action as the geopolitical risk having resolved',
+        'Sep payrolls badly missed (+29K) + inflation reaccelerating simultaneously — the clearest stagflation signature yet this cycle',
+        'MAS held for 2nd straight review (Oct 14), in contrast to the Fed\'s hike-lean path — policy divergence worth tracking for SGD',
     ],
     'quadrant_b_distance': 'far',
 }
@@ -206,7 +206,7 @@ NAV_HISTORY_PATH = 'output/nav_history_satellite.json'
 # ============================================================
 # SNAPSHOT DATE
 # ============================================================
-SNAPSHOT_DATE = '2026-09-14'
+SNAPSHOT_DATE = '2026-11-09'
 
 # ============================================================
 # DATA FRESHNESS METADATA
@@ -219,7 +219,7 @@ DATA_FRESHNESS = {
         'update_action': 'Run main.py --satellite (any extract mode); bump SNAPSHOT_DATE to today',
     },
     'macro_regime': {
-        'value':         '2026-09-14',
+        'value':         '2026-11-09',
         'cadence_days':  7,
         'label':         'Macro regime block',
         'update_action': 'Update MACRO_REGIME dict + open_inflections in settings_satellite.py; bump value here',
@@ -237,7 +237,7 @@ DATA_FRESHNESS = {
         'update_action': 'Review SATELLITE_TARGETS for post-trade changes; bump value here',
     },
     'watchlist': {
-        'value':         '2026-09-14',
+        'value':         '2026-10-27',
         'cadence_days':  14,
         'label':         'Watchlist pending actions',
         'update_action': 'Resolve or extend each WATCHLIST entry; bump value here',
